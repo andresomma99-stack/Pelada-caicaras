@@ -1616,6 +1616,7 @@ function confirmarGoleiros() {
 }
 
 async function finalizarInicioPelada() {
+  if (!pelada_data.dia || !pelada_data.mes) { showNotif('⚠ Escolha a data da pelada primeiro.'); return; }
   matchHistory = []; liveScore = { red:0, yellow:0, blue:0 }; pendente = null; eventosDB = [];
   clearInterval(currentMatch.timerInterval);
   Object.assign(currentMatch, {started:false,ended:false,startedAt:null,pausedAt:null,pausedMs:0,timerInterval:null,paused:false});

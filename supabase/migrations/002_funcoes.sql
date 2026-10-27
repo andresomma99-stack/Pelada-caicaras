@@ -206,7 +206,7 @@ returns jsonb language plpgsql security definer set search_path = '' as $$
 declare
   v_status text;
   v_partidas int := coalesce((p_payload->>'partidasRegistradas')::int, 0);
-  t text; nome text; res text;
+  t text; v_nome text; res text;
 begin
   select status into v_status from public.peladas where id = p_id for update;
   if v_status is distinct from 'ao_vivo' then raise exception 'pelada_ja_encerrada'; end if;
@@ -223,9 +223,9 @@ begin
   -- jogadores dos times (V/E/D)
   foreach t in array array['red','yellow','blue'] loop
     res := p_payload->'teamResults'->>t;
-    for nome in select jsonb_array_elements_text(coalesce(p_payload->'jogadoresPorTime'->t, '[]'::jsonb)) loop
+    for v_nome in select jsonb_array_elements_text(coalesce(p_payload->'jogadoresPorTime'->t, '[]'::jsonb)) loop
       insert into public.participacoes (pelada_id, jogador_id, time, resultado)
-      select p_id, j.id, t, res from public.jogadores j where j.nome = trim(nome)
+      select p_id, j.id, t, res from public.jogadores j where j.nome = trim(v_nome)
       on conflict (pelada_id, jogador_id) do update set time = excluded.time, resultado = excluded.resultado;
     end loop;
   end loop;
