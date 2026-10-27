@@ -77,7 +77,13 @@
   td.center { text-align:center; }
   
   /* G4 & Ranks */
-  .rank-cell { font-family:'Space Mono',monospace; font-size:0.75rem; font-weight:700; color:var(--muted); width:40px; position:relative; }
+  .rank-cell { font-family:'Space Mono',monospace; font-size:0.75rem; font-weight:700; color:var(--muted); width:40px; position:relative; white-space:nowrap; }
+  .rank-wrap { display:inline-flex; align-items:center; gap:6px; }
+  .pos-var { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; font-family:'Space Mono',monospace; font-size:0.68rem; font-weight:700; line-height:1; flex-shrink:0; }
+  .pos-up   { background:var(--win);  color:#04130b; clip-path:polygon(50% 0, 100% 42%, 100% 100%, 0 100%, 0 42%); padding-top:7px; }
+  .pos-down { background:var(--loss); color:#fff;    clip-path:polygon(0 0, 100% 0, 100% 58%, 50% 100%, 0 58%);  padding-bottom:7px; }
+  .pos-same { color:var(--muted); font-size:0.7rem; opacity:0.5; }
+  .pos-new  { width:auto; height:auto; padding:2px 5px; border-radius:4px; font-size:0.52rem; letter-spacing:0.06em; color:var(--green); border:1px solid rgba(0,217,111,0.35); background:rgba(0,217,111,0.08); }
   tr.g4 .rank-cell { color: var(--text); }
   tr.g4 .rank-cell::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--g4-color); border-radius:3px 0 0 3px; }
   .rank-1 .rank-cell { color:#FFD700 !important; }
@@ -793,6 +799,17 @@ let assistenciasData = [];
 let presencaData = [];
 
 let historicoPeladas = [];
+let posAnterior = null;   // posições antes da última pelada (para as setas)
+
+function varPos(lista, nome, idx) {
+  if (!posAnterior || !posAnterior[lista]) return '';
+  const ant = posAnterior[lista][nome];
+  if (!ant) return '<span class="pos-var pos-new" title="Entrou na lista na última pelada">NOVO</span>';
+  const d = ant - (idx + 1);
+  if (d > 0) return `<span class="pos-var pos-up" title="Subiu ${d} posiç${d>1?'ões':'ão'} na última pelada">${d}</span>`;
+  if (d < 0) return `<span class="pos-var pos-down" title="Caiu ${-d} posiç${-d>1?'ões':'ão'} na última pelada">${-d}</span>`;
+  return '<span class="pos-var pos-same" title="Manteve a posição">–</span>';
+}
 let datasPeladas = [];
 const allPlayers = [];
 
@@ -2053,7 +2070,7 @@ function renderRanking() {
     }).join('');
 
     return `<tr class="${rowClass}" data-name="${r.name.toLowerCase()}">
-      <td class="left rank-cell ${rankClass}">${i+1}°</td>
+      <td class="left rank-cell ${rankClass}"><span class="rank-wrap">${i+1}°${varPos('ranking', r.name, i)}</span></td>
       <td class="left"><span class="player-name">${r.name}</span></td>
       <td class="num"><span class="pts">${r.pts}</span></td>
       <td class="num stat-col">${r.j}</td>
@@ -2089,7 +2106,7 @@ function renderArtilharia() {
     }).join('');
 
     return `<tr class="${rowClass}" data-name="${r.name.toLowerCase()}">
-      <td class="left rank-cell ${rankClass}">${i+1}°</td>
+      <td class="left rank-cell ${rankClass}"><span class="rank-wrap">${i+1}°${varPos('artilharia', r.name, i)}</span></td>
       <td class="left"><span class="player-name">${r.name}</span></td>
       <td class="num"><div class="goal-count"><span>⚽</span><span class="goal-num">${r.gols}</span></div></td>
       <td class="num stat-col">${r.j}</td>
@@ -2118,7 +2135,7 @@ function renderAssistencias() {
     }).join('');
 
     return `<tr class="${rowClass}" data-name="${r.name.toLowerCase()}">
-      <td class="left rank-cell ${rankClass}">${i+1}°</td>
+      <td class="left rank-cell ${rankClass}"><span class="rank-wrap">${i+1}°${varPos('assistencias', r.name, i)}</span></td>
       <td class="left"><span class="player-name">${r.name}</span></td>
       <td class="num"><div class="goal-count"><span>🎯</span><span class="goal-num" style="color:var(--yellow)">${r.assists}</span></div></td>
       <td class="num stat-col">${r.j}</td>
@@ -2149,7 +2166,7 @@ function renderPresenca() {
     }).join(' ');
 
     return `<tr class="${rowClass}" data-name="${r.name.toLowerCase()}">
-      <td class="left rank-cell ${rankClass}">${i+1}°</td>
+      <td class="left rank-cell ${rankClass}"><span class="rank-wrap">${i+1}°${varPos('presenca', r.name, i)}</span></td>
       <td class="left"><span class="player-name">${r.name}</span></td>
       <td class="num" style="color:var(--green);font-family:'Space Mono',monospace;font-weight:700">${r.u10}</td>
       <td class="num stat-col">${r.anual}</td>
@@ -2318,6 +2335,7 @@ function aplicarDados(data) {
   if (data.datasPeladas)     { datasPeladas.length = 0;     datasPeladas.push(...data.datasPeladas); }
   if (data.historicoPeladas) { historicoPeladas.length = 0; historicoPeladas.push(...data.historicoPeladas); }
   if (data.goleiroStats)     { goleiroStats = data.goleiroStats; }
+  posAnterior = data.posAnterior || null;
   if (data.jogadores) {
     const nomes = new Set([...allPlayers, ...data.jogadores]);
     allPlayers.length = 0;
