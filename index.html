@@ -1091,8 +1091,9 @@ async function enviarFila() {
   enviandoFila = true;
   let enviou = false;
   try {
-    let f = filaLer();
-    while (f.length) {
+    while (true) {
+      const f = filaLer();
+      if (!f.length) break;
       const ev = f[0];
       let error = null;
       try {
@@ -1100,11 +1101,12 @@ async function enviarFila() {
           p_id: ev.pelada_id, p_client_id: ev.client_id, p_partida: ev.partida, p_tipo: ev.type,
           p_jogador: ev.player, p_time: ev.team, p_minuto: ev.minute, p_aparelho: APARELHO }));
       } catch (e) { error = e; }
+      const tirar = () => filaGravar(filaLer().filter(x => x.client_id !== ev.client_id));
       if (error) {
-        if (msgErro(error).includes('nao_esta_ao_vivo')) { f.shift(); filaGravar(f); continue; }
+        if (msgErro(error).includes('nao_esta_ao_vivo')) { tirar(); continue; }
         break; // sem conexão: tenta depois
       }
-      f.shift(); filaGravar(f); enviou = true;
+      tirar(); enviou = true;
     }
   } finally {
     enviandoFila = false;
