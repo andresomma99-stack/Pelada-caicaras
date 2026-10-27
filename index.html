@@ -77,8 +77,8 @@
   td.center { text-align:center; }
   
   /* G4 & Ranks */
-  .rank-cell { font-family:'Space Mono',monospace; font-size:0.75rem; font-weight:700; color:var(--muted); width:40px; position:relative; white-space:nowrap; }
-  .rank-wrap { display:inline-flex; align-items:center; gap:6px; }
+  .rank-cell { font-family:'Space Mono',monospace; font-size:0.75rem; font-weight:700; color:var(--muted); width:40px; position:relative; }
+  .name-wrap { display:inline-flex; align-items:center; gap:8px; }
   .pos-var { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; font-family:'Space Mono',monospace; font-size:0.68rem; font-weight:700; line-height:1; flex-shrink:0; }
   .pos-up   { background:var(--win);  color:#04130b; clip-path:polygon(50% 0, 100% 42%, 100% 100%, 0 100%, 0 42%); padding-top:7px; }
   .pos-down { background:var(--loss); color:#fff;    clip-path:polygon(0 0, 100% 0, 100% 58%, 50% 100%, 0 58%);  padding-bottom:7px; }
@@ -2070,8 +2070,8 @@ function renderRanking() {
     }).join('');
 
     return `<tr class="${rowClass}" data-name="${r.name.toLowerCase()}">
-      <td class="left rank-cell ${rankClass}"><span class="rank-wrap">${i+1}°${varPos('ranking', r.name, i)}</span></td>
-      <td class="left"><span class="player-name">${r.name}</span></td>
+      <td class="left rank-cell ${rankClass}">${i+1}°</td>
+      <td class="left"><span class="name-wrap"><span class="player-name">${r.name}</span>${varPos('ranking', r.name, i)}</span></td>
       <td class="num"><span class="pts">${r.pts}</span></td>
       <td class="num stat-col">${r.j}</td>
       <td class="num stat-col stat-v">${r.v}</td>
@@ -2106,8 +2106,8 @@ function renderArtilharia() {
     }).join('');
 
     return `<tr class="${rowClass}" data-name="${r.name.toLowerCase()}">
-      <td class="left rank-cell ${rankClass}"><span class="rank-wrap">${i+1}°${varPos('artilharia', r.name, i)}</span></td>
-      <td class="left"><span class="player-name">${r.name}</span></td>
+      <td class="left rank-cell ${rankClass}">${i+1}°</td>
+      <td class="left"><span class="name-wrap"><span class="player-name">${r.name}</span>${varPos('artilharia', r.name, i)}</span></td>
       <td class="num"><div class="goal-count"><span>⚽</span><span class="goal-num">${r.gols}</span></div></td>
       <td class="num stat-col">${r.j}</td>
       <td class="num stat-col" style="color:var(--green)">${r.media.toFixed(2)}</td>
@@ -2135,8 +2135,8 @@ function renderAssistencias() {
     }).join('');
 
     return `<tr class="${rowClass}" data-name="${r.name.toLowerCase()}">
-      <td class="left rank-cell ${rankClass}"><span class="rank-wrap">${i+1}°${varPos('assistencias', r.name, i)}</span></td>
-      <td class="left"><span class="player-name">${r.name}</span></td>
+      <td class="left rank-cell ${rankClass}">${i+1}°</td>
+      <td class="left"><span class="name-wrap"><span class="player-name">${r.name}</span>${varPos('assistencias', r.name, i)}</span></td>
       <td class="num"><div class="goal-count"><span>🎯</span><span class="goal-num" style="color:var(--yellow)">${r.assists}</span></div></td>
       <td class="num stat-col">${r.j}</td>
       <td class="num stat-col" style="color:var(--yellow)">${r.media.toFixed(2)}</td>
@@ -2166,7 +2166,7 @@ function renderPresenca() {
     }).join(' ');
 
     return `<tr class="${rowClass}" data-name="${r.name.toLowerCase()}">
-      <td class="left rank-cell ${rankClass}"><span class="rank-wrap">${i+1}°${varPos('presenca', r.name, i)}</span></td>
+      <td class="left rank-cell ${rankClass}">${i+1}°</td>
       <td class="left"><span class="player-name">${r.name}</span></td>
       <td class="num" style="color:var(--green);font-family:'Space Mono',monospace;font-weight:700">${r.u10}</td>
       <td class="num stat-col">${r.anual}</td>
