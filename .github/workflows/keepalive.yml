@@ -1,0 +1,26 @@
+name: Keep-alive Supabase
+# O plano gratuito do Supabase pausa o projeto após 7 dias sem uso.
+# Este ping a cada 3 dias mantém o banco sempre acordado.
+on:
+  schedule:
+    - cron: "17 12 */3 * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping no banco
+        env:
+          SUPABASE_URL: https://magwhphfkofjuxiadcdx.supabase.co
+          SUPABASE_KEY: sb_publishable_nML8h1TQEW3O_2b4mRPbyQ_fcW2QmT6
+        run: |
+          for i in 1 2 3 4 5; do
+            if curl -fsS -X POST "$SUPABASE_URL/rest/v1/rpc/ping" \
+                 -H "apikey: $SUPABASE_KEY" -H "Content-Type: application/json" -d '{}'; then
+              echo; echo "Banco respondeu."; exit 0
+            fi
+            echo "Tentativa $i falhou, aguardando..."; sleep $((i * 20))
+          done
+          echo "::error::O banco não respondeu. Ele pode ter sido pausado — reative em supabase.com."
+          exit 1
