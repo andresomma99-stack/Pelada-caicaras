@@ -3,7 +3,28 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pelada de Quinta ⚽</title>
+<title>Pelada de Quinta · Caiçaras</title>
+<meta name="description" content="Classificação, artilharia, assistências, presença e pelada ao vivo dos Caiçaras.">
+<meta name="theme-color" content="#0A0C0F">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
+<link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pelada">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Pelada de Quinta">
+<meta property="og:title" content="Pelada de Quinta · Caiçaras">
+<meta property="og:description" content="Classificação, artilharia, assistências e a pelada ao vivo.">
+<meta property="og:url" content="https://pelada-caicaras.vercel.app/">
+<meta property="og:image" content="https://pelada-caicaras.vercel.app/img/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="pt_BR">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://pelada-caicaras.vercel.app/img/og.png">
 <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=DM+Sans:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 
 <style>
@@ -24,7 +45,9 @@
   .header-bg { position:absolute; inset:0; background:radial-gradient(ellipse 80% 120% at 50% -20%, rgba(0,217,111,0.08) 0%, transparent 70%); pointer-events:none; }
   .header-inner { max-width:1200px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; padding:1.5rem 0; position:relative; }
   .logo-area { display:flex; align-items:center; gap:1rem; }
-  .logo-ball { font-size:2.8rem; filter:drop-shadow(0 0 20px rgba(0,217,111,0.3)); animation:float 3s ease-in-out infinite; }
+  .logo-ball { width:64px; height:64px; flex-shrink:0; filter:drop-shadow(0 0 18px rgba(0,80,149,0.55)); animation:float 3s ease-in-out infinite; }
+  .logo-ball img { width:100%; height:100%; display:block; }
+  @media(max-width:600px){ .logo-ball { width:48px; height:48px; } }
   @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
   .logo-text h1 { font-family:'Black Han Sans',sans-serif; font-size:1.9rem; letter-spacing:0.04em; color:#fff; line-height:1; }
   .logo-text span { font-family:'Space Mono',monospace; font-size:0.72rem; color:var(--green); letter-spacing:0.18em; text-transform:uppercase; }
@@ -302,7 +325,7 @@
   <div class="header-bg"></div>
   <div class="header-inner">
     <div class="logo-area">
-      <div class="logo-ball">⚽</div>
+      <div class="logo-ball"><img src="/img/logo.png" alt="Caiçaras" width="64" height="64"></div>
       <div class="logo-text">
         <h1>PELADA DE QUINTA</h1>
         <span>Desde 2024</span>
