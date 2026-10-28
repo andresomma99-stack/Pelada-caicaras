@@ -393,6 +393,21 @@
   .pj-delta.up { color:var(--win); background:rgba(0,217,111,0.1); }
   .pj-delta.down { color:var(--loss); background:rgba(255,71,87,0.1); }
   .pj-empty { color:var(--muted); font-size:0.85rem; }
+  .pj-toolbar { display:flex; justify-content:space-between; align-items:center; gap:0.75rem; margin-bottom:1.5rem; }
+  .pj-toolbar .pj-back { margin-bottom:0; }
+  .pj-share { color:var(--green); border-color:rgba(0,217,111,0.35); }
+  .pj-share:disabled { opacity:0.6; cursor:wait; }
+  .pj-radar-box { margin-top:0; margin-bottom:0.75rem; }
+  .pj-radar { display:block; width:100%; max-width:340px; margin:0 auto; overflow:visible; }
+  .rd-grid { fill:none; stroke:var(--surface2); stroke-width:1; }
+  .rd-borda { fill:rgba(255,255,255,0.02); stroke:var(--muted); stroke-width:1.5; }
+  .rd-raio { stroke:var(--muted); stroke-width:1; stroke-dasharray:4 4; opacity:0.7; }
+  .rd-area { fill:rgba(0,217,111,0.25); stroke:var(--green); stroke-width:2; stroke-linejoin:round; }
+  .rd-pt { fill:var(--green); }
+  .rd-centro { fill:var(--text-muted); }
+  .rd-val { fill:#fff; font-family:'Space Mono',monospace; font-weight:700; font-size:15px; text-anchor:middle; }
+  .rd-lbl { fill:var(--text-muted); font-family:'Space Mono',monospace; font-size:10px; letter-spacing:0.08em; text-anchor:middle; }
+  .rd-off { opacity:0.4; }
   .pj-attr.off { opacity:0.38; }
   .pj-var .pos-badge { min-width:34px; font-size:0.6rem; padding:0.2rem 0.4rem; }
   .pj-delta:not(.up):not(.down) { color:var(--muted); background:var(--surface); }
@@ -2685,6 +2700,192 @@ function voltarClassificacao() {
 window.addEventListener('hashchange', rotaJogador);
 document.addEventListener('click', e => { if (e.target.closest && e.target.closest('.player-link')) { try { sessionStorage.setItem('pj_nav', '1'); } catch (x) {} } });
 
+// ---------- gráfico pentágono (atributos do overall) ----------
+const RADAR_ATTRS = [['RES', 'Resultados'], ['ATA', 'Ataque'], ['FOR', 'Forma'], ['ASS', 'Assiduidade'], ['EXP', 'Experiência']];
+const RADAR_MIN = 20, RADAR_MAX = 99;
+function radarPonto(cx, cy, R, i, frac) {
+  const ang = (-90 + i * 72) * Math.PI / 180;
+  return [cx + Math.cos(ang) * R * frac, cy + Math.sin(ang) * R * frac];
+}
+function radarFrac(v) { return v == null ? 0 : Math.max(0.04, Math.min(1, (v - RADAR_MIN) / (RADAR_MAX - RADAR_MIN))); }
+function radarSvg(attrs, pesos, temOverall) {
+  const W = 300, H = 270, cx = 150, cy = 142, R = 92;
+  const poly = frac => RADAR_ATTRS.map((_, i) => radarPonto(cx, cy, R, i, frac).map(n => n.toFixed(1)).join(',')).join(' ');
+  let g = '';
+  [0.25, 0.5, 0.75, 1].forEach(f => { g += `<polygon points="${poly(f)}" class="rd-grid${f === 1 ? ' rd-borda' : ''}"/>`; });
+  RADAR_ATTRS.forEach((_, i) => {
+    const [x1, y1] = radarPonto(cx, cy, R, i, -0.12), [x2, y2] = radarPonto(cx, cy, R, i, 1.18);
+    g += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="rd-raio"/>`;
+  });
+  if (temOverall) {
+    const pts = RADAR_ATTRS.map(([k], i) => radarPonto(cx, cy, R, i, radarFrac(attrs[k])));
+    g += `<polygon points="${pts.map(p => p.map(n => n.toFixed(1)).join(',')).join(' ')}" class="rd-area"/>`;
+    g += pts.map(([x, y]) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5" class="rd-pt"/>`).join('');
+  }
+  g += `<circle cx="${cx}" cy="${cy}" r="2.5" class="rd-centro"/>`;
+  RADAR_ATTRS.forEach(([k], i) => {
+    const [x, y] = radarPonto(cx, cy, R, i, 1.36);
+    const off = temOverall && !pesos[k] ? ' rd-off' : '';
+    g += `<text x="${x.toFixed(1)}" y="${(y - 3).toFixed(1)}" class="rd-val${off}">${temOverall ? attrs[k] : '–'}</text>`;
+    g += `<text x="${x.toFixed(1)}" y="${(y + 11).toFixed(1)}" class="rd-lbl${off}">${k}</text>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" class="pj-radar" role="img" aria-label="Gráfico dos atributos do overall">${g}</svg>`;
+}
+
+// ---------- compartilhar o card como imagem ----------
+const TIER_CORES = {
+  'tier-elite':  ['#0f5c3a', '#06150f', '#d9ffe9', 'rgba(0,217,111,0.6)'],
+  'tier-ouro':   ['#6b5410', '#1d1806', '#ffeaa0', 'rgba(255,214,0,0.55)'],
+  'tier-prata':  ['#4e5666', '#171b24', '#e3e8ef', 'rgba(192,192,192,0.5)'],
+  'tier-bronze': ['#5e3a1c', '#1a1009', '#f1c9a1', 'rgba(205,127,50,0.5)'],
+  '':            ['#3a4152', '#1a1f2c', '#e8edf2', 'rgba(255,255,255,0.18)'],
+};
+const POS_CORES = { ZAG: '#FF4757', LAT: '#4A9EFF', MEI: '#00D96F', ATA: '#FFD600' };
+let pjAtual = null;   // dados do jogador aberto (preenchido por renderJogador)
+
+function carregarImg(src) {
+  return new Promise(res => { if (!src) return res(null); const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = src; });
+}
+function rrect(ctx, x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+function pill(ctx, txt, xDir, y, cor, fundo) {
+  ctx.font = '700 26px "Space Mono", monospace';
+  const w = ctx.measureText(txt).width + 32;
+  rrect(ctx, xDir - w, y, w, 46, 10);
+  if (fundo) { ctx.fillStyle = fundo; ctx.fill(); }
+  ctx.strokeStyle = cor; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = cor; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(txt, xDir - w / 2, y + 24);
+  return 46;
+}
+
+async function gerarImagemCard(d) {
+  try {
+    await Promise.all(['160px "Black Han Sans"', '700 40px "DM Sans"', '700 26px "Space Mono"'].map(f => document.fonts.load(f)));
+  } catch (e) {}
+  const W = 1080, H = 1350;
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d');
+  const [t1, t2, tc, ta] = TIER_CORES[d.tierCls] || TIER_CORES[''];
+  const [logo, foto] = await Promise.all([carregarImg('/img/logo.png'), carregarImg(FOTOS_JOGADORES[d.nome])]);
+
+  // fundo
+  ctx.fillStyle = '#0a0d13'; ctx.fillRect(0, 0, W, H);
+  const gl = ctx.createRadialGradient(W / 2, 0, 50, W / 2, 0, 900);
+  gl.addColorStop(0, 'rgba(0,217,111,0.14)'); gl.addColorStop(1, 'rgba(0,217,111,0)');
+  ctx.fillStyle = gl; ctx.fillRect(0, 0, W, H);
+  // cabeçalho
+  if (logo) ctx.drawImage(logo, 60, 28, 72, 72);
+  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = '#fff'; ctx.font = '44px "Black Han Sans", "DM Sans", sans-serif';
+  ctx.fillText('PELADA DE QUINTA', 150, 72);
+  ctx.fillStyle = '#00D96F'; ctx.font = '700 20px "Space Mono", monospace';
+  ctx.fillText('CAIÇARAS · CARD DO JOGADOR', 152, 100);
+
+  // card
+  const cx0 = 80, cy0 = 130, cw = W - 160, ch = 1110;
+  ctx.save();
+  rrect(ctx, cx0, cy0, cw, ch, 40);
+  const gc = ctx.createLinearGradient(cx0, cy0, cx0 + cw * 0.6, cy0 + ch);
+  gc.addColorStop(0, t1); gc.addColorStop(0.75, t2);
+  ctx.fillStyle = gc; ctx.fill();
+  ctx.clip();
+  ctx.strokeStyle = 'rgba(255,255,255,0.035)'; ctx.lineWidth = 4;
+  for (let x = -ch; x < cw + ch; x += 30) { ctx.beginPath(); ctx.moveTo(cx0 + x, cy0); ctx.lineTo(cx0 + x + ch * 0.47, cy0 + ch); ctx.stroke(); }
+  ctx.restore();
+  rrect(ctx, cx0, cy0, cw, ch, 40); ctx.strokeStyle = ta; ctx.lineWidth = 3; ctx.stroke();
+
+  // overall
+  ctx.fillStyle = tc; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  ctx.font = '170px "Black Han Sans", "DM Sans", sans-serif';
+  ctx.fillText(String(d.ovr), cx0 + 60, cy0 + 200);
+  ctx.globalAlpha = 0.75; ctx.font = '700 24px "Space Mono", monospace';
+  ctx.fillText('OVERALL', cx0 + 66, cy0 + 245); ctx.globalAlpha = 1;
+  // selos à direita
+  let yy = cy0 + 50;
+  yy += pill(ctx, d.tierNome.toUpperCase(), cx0 + cw - 50, yy, tc) + 12;
+  if (d.principal) yy += pill(ctx, d.principal, cx0 + cw - 50, yy, POS_CORES[d.principal], 'rgba(0,0,0,0.25)') + 12;
+  if (d.prov) { ctx.globalAlpha = 0.8; ctx.fillStyle = tc; ctx.font = '700 20px "Space Mono", monospace'; ctx.textAlign = 'right'; ctx.fillText('PROVISÓRIO', cx0 + cw - 50, yy + 22); ctx.globalAlpha = 1; }
+
+  // avatar
+  const ax = W / 2, ay = cy0 + 210, ar = 135;
+  ctx.save(); ctx.beginPath(); ctx.arc(ax, ay, ar, 0, Math.PI * 2); ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fill(); ctx.clip();
+  if (foto) { const s = Math.min(foto.width, foto.height); ctx.drawImage(foto, (foto.width - s) / 2, (foto.height - s) / 2, s, s, ax - ar, ay - ar, ar * 2, ar * 2); }
+  else { ctx.fillStyle = tc; ctx.font = '110px "Black Han Sans", "DM Sans", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(iniciaisJogador(d.nome), ax, ay + 6); }
+  ctx.restore();
+  ctx.beginPath(); ctx.arc(ax, ay, ar, 0, Math.PI * 2); ctx.strokeStyle = ta; ctx.lineWidth = 6; ctx.stroke();
+  // nome
+  ctx.fillStyle = tc; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  let fs = 64; ctx.font = `700 ${fs}px "DM Sans", sans-serif`;
+  while (ctx.measureText(d.nome.toUpperCase()).width > cw - 120 && fs > 36) { fs -= 4; ctx.font = `700 ${fs}px "DM Sans", sans-serif`; }
+  ctx.fillText(d.nome.toUpperCase(), W / 2, ay + ar + 80);
+
+  // pentágono
+  const rx = W / 2, ry = cy0 + 715, R = 175;
+  const poly = frac => { ctx.beginPath(); RADAR_ATTRS.forEach((_, i) => { const [x, y] = radarPonto(rx, ry, R, i, frac); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.closePath(); };
+  [0.25, 0.5, 0.75, 1].forEach(f => { poly(f); ctx.strokeStyle = f === 1 ? ta : 'rgba(255,255,255,0.12)'; ctx.lineWidth = f === 1 ? 3 : 2; ctx.stroke(); });
+  ctx.setLineDash([10, 10]); ctx.strokeStyle = 'rgba(255,255,255,0.28)'; ctx.lineWidth = 2;
+  RADAR_ATTRS.forEach((_, i) => { const [x1, y1] = radarPonto(rx, ry, R, i, -0.12), [x2, y2] = radarPonto(rx, ry, R, i, 1.15); ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); });
+  ctx.setLineDash([]);
+  if (d.temOverall) {
+    ctx.beginPath();
+    RADAR_ATTRS.forEach(([k], i) => { const [x, y] = radarPonto(rx, ry, R, i, radarFrac(d.attrs[k])); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+    ctx.closePath(); ctx.fillStyle = 'rgba(0,217,111,0.28)'; ctx.fill(); ctx.strokeStyle = '#00D96F'; ctx.lineWidth = 4; ctx.stroke();
+    RADAR_ATTRS.forEach(([k], i) => { const [x, y] = radarPonto(rx, ry, R, i, radarFrac(d.attrs[k])); ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.fillStyle = '#00D96F'; ctx.fill(); });
+  }
+  RADAR_ATTRS.forEach(([k], i) => {
+    const [x, y] = radarPonto(rx, ry, R, i, 1.38);
+    ctx.globalAlpha = d.temOverall && !d.pesos[k] ? 0.4 : 1;
+    ctx.fillStyle = tc; ctx.textAlign = 'center';
+    ctx.font = '700 40px "Space Mono", monospace'; ctx.fillText(d.temOverall ? String(d.attrs[k]) : '–', x, y + 4);
+    ctx.font = '700 22px "Space Mono", monospace'; ctx.globalAlpha *= 0.8; ctx.fillText(k, x, y + 32);
+    ctx.globalAlpha = 1;
+  });
+
+  // estatísticas
+  const sy = cy0 + ch - 150;
+  ctx.fillStyle = 'rgba(0,0,0,0.25)'; rrect(ctx, cx0 + 40, sy, cw - 80, 115, 22); ctx.fill();
+  const st = [[d.r.j, 'JOGOS'], [d.r.pts, 'PONTOS'], [(d.r.pct * 100).toFixed(0) + '%', 'APROV.'], [d.gols, 'GOLS'], [d.assists, 'ASSIST.']];
+  const colW = (cw - 80) / st.length;
+  st.forEach(([v, l], i) => {
+    const x = cx0 + 40 + colW * (i + 0.5);
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.font = '700 44px "Space Mono", monospace'; ctx.fillText(String(v), x, sy + 62);
+    ctx.fillStyle = tc; ctx.globalAlpha = 0.7; ctx.font = '700 18px "Space Mono", monospace'; ctx.fillText(l, x, sy + 94); ctx.globalAlpha = 1;
+  });
+
+  // rodapé
+  ctx.fillStyle = '#5e6b82'; ctx.font = '600 22px "DM Sans", sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText(`pelada-caicaras.vercel.app · ${new Date().toLocaleDateString('pt-BR')}`, W / 2, H - 50);
+  return new Promise(res => cv.toBlob(res, 'image/png'));
+}
+
+async function compartilharCard() {
+  if (!pjAtual) return;
+  const btn = document.getElementById('pj-share-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Gerando…'; }
+  try {
+    const blob = await gerarImagemCard(pjAtual);
+    const nomeArq = 'card-' + pjAtual.nome.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').toLowerCase() + '.png';
+    const file = new File([blob], nomeArq, { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: `Card · ${pjAtual.nome}` }); }
+      catch (e) { if (e.name !== 'AbortError') throw e; }
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = nomeArq;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      showNotif('🖼 Imagem do card baixada.');
+    }
+  } catch (e) {
+    console.error(e); showNotif('⚠ Não foi possível gerar a imagem.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '📤 Compartilhar'; }
+  }
+}
+
 function renderJogador(nome) {
   const el = document.getElementById('jogador-content');
   const sorted = [...rankingData].sort((a, b) => b.pts - a.pts || b.pct - a.pct);
@@ -2749,12 +2950,16 @@ function renderJogador(nome) {
     </div>`;
   }
 
+  pjAtual = { nome, ovr, attrs, pesos, tierCls, tierNome, prov, principal: ov ? ov.atual.principal : null, temOverall: !!ov, r, gols, assists };
   const A = (k, lbl) => `<div class="pj-attr${ov && !pesos[k] ? ' off' : ''}"><b>${attrs[k] ?? '–'}</b><span>${lbl}</span></div>`;
   const S = (v, lbl, cls = '') => `<div class="pj-stat"><div class="pj-stat-val ${cls}">${v}</div><div class="pj-stat-lbl">${lbl}</div></div>`;
   const P = OVR_CFG.PESOS;
   const pc = (w, k) => Math.round(w[k] * 100) + '%';
   el.innerHTML = `
-    <button class="pj-back" onclick="voltarClassificacao()">← Classificação</button>
+    <div class="pj-toolbar">
+      <button class="pj-back" onclick="voltarClassificacao()">← Classificação</button>
+      <button class="pj-back pj-share" id="pj-share-btn" onclick="compartilharCard()">📤 Compartilhar</button>
+    </div>
     <div class="pj-hero">
       <div class="pj-card ${tierCls}">
         <div class="pj-top">
@@ -2772,6 +2977,7 @@ function renderJogador(nome) {
         </div>
       </div>
       <div>
+        <div class="pj-block pj-radar-box"><h3>Atributos do overall</h3>${radarSvg(attrs, pesos, !!ov)}</div>
         <div class="pj-stats">
           ${S(r.j, 'Peladas jogadas')}
           ${S(r.pts, 'Pontos', 'g')}
