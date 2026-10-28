@@ -30,6 +30,10 @@ naquele dia é uma linha em `participacoes` (time, V/E/D, gols, assistências, p
 - **Overall (card do jogador)**: calculado no site a partir de `historicoPeladas`, começando na primeira pelada com
   posições gravadas. Os pesos dos atributos dependem da posição (ATA/MEI × ZAG/LAT); faltas só reduzem a assiduidade.
   Provisório até 5 peladas jogadas. Pesos em `OVR_CFG` no `index.html`.
+- **Jogador da semana (POTW)**: nota do dia (0–10) de cada pelada com posição, calculada no site
+  (`NOTA_CFG`): resultado com o peso de RES da posição + gols/assistências com retorno decrescente.
+  O vencedor ganha a coroa na Classificação até a próxima pelada; a lista fica na aba POTW.
+  `get_dados` devolve o `time` de cada jogador (migração 008) para a imagem de resultado.
 - Ninguém escreve nas tabelas diretamente: só por essas funções.
 
 Migrações em `supabase/migrations/`.

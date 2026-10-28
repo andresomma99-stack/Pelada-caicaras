@@ -395,6 +395,22 @@
   .pj-empty { color:var(--muted); font-size:0.85rem; }
   .pj-toolbar { display:flex; justify-content:space-between; align-items:center; gap:0.75rem; margin-bottom:1.5rem; }
   .pj-toolbar .pj-back { margin-bottom:0; }
+  .potw-crown { font-size:0.95rem; line-height:1; filter:drop-shadow(0 0 6px rgba(255,214,0,0.45)); }
+  .potw-banner, .potw-resumo { display:flex; align-items:center; gap:1rem; }
+  .potw-banner { background:linear-gradient(110deg, rgba(255,214,0,0.12), rgba(255,214,0,0.03) 60%); border:1px solid rgba(255,214,0,0.4); border-radius:14px; padding:0.9rem 1.1rem; margin-bottom:1.5rem; }
+  .potw-b-av { width:58px; height:58px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; overflow:hidden; background:#1d1806; border:2px solid var(--yellow); color:#ffeaa0; font-family:'Black Han Sans',sans-serif; font-size:1.3rem; }
+  .potw-b-av img { width:100%; height:100%; object-fit:cover; }
+  .potw-b-info { flex:1; min-width:0; }
+  .potw-b-tit { font-family:'Space Mono',monospace; font-size:0.62rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--yellow); font-weight:700; }
+  .potw-b-nome { font-weight:700; font-size:1.1rem; margin:2px 0; display:flex; align-items:center; gap:8px; }
+  .potw-b-nome .player-link { border-bottom:none; }
+  .potw-b-stats { font-size:0.8rem; color:var(--text-muted); }
+  .potw-b-stats b { color:var(--yellow); font-family:'Space Mono',monospace; }
+  .potw-b-acoes { display:flex; gap:0.5rem; }
+  .potw-b-acoes .pj-back { margin-bottom:0; }
+  @media(max-width:600px){ .potw-banner { flex-wrap:wrap; } .potw-b-acoes { width:100%; } .potw-b-acoes .pj-back { flex:1; justify-content:center; } }
+  .potw-table tr.potw-atual { background:rgba(255,214,0,0.06); }
+  .potw-stats { display:inline-flex; align-items:center; gap:10px; font-family:'Space Mono',monospace; font-size:0.78rem; color:var(--text-muted); }
   .pj-share { color:var(--green); border-color:rgba(0,217,111,0.35); }
   .pj-share:disabled { opacity:0.6; cursor:wait; }
   .pj-radar-box { margin-top:0; margin-bottom:0.75rem; }
@@ -451,6 +467,7 @@
   <div class="tab-bar-inner">
     <button class="tab-btn active" onclick="switchTab('ranking',this)"><span class="tab-icon">🏆</span>Classificação</button>
     <button class="tab-btn live-tab" onclick="switchTab('aovivo',this)"><span class="live-dot"></span>Ao Vivo</button>
+    <button class="tab-btn" onclick="switchTab('potw',this)"><span class="tab-icon">👑</span>POTW</button>
     <button class="tab-btn" onclick="switchTab('artilharia',this)"><span class="tab-icon">⚽</span>Artilharia</button>
     <button class="tab-btn" onclick="switchTab('assistencias',this)"><span class="tab-icon">🎯</span>Assistências</button>
     <button class="tab-btn" onclick="switchTab('presenca',this)"><span class="tab-icon">📅</span>Presença</button>
@@ -464,6 +481,7 @@
 
 <!-- RANKING -->
 <div id="tab-ranking" class="tab-panel active">
+  <div id="potw-banner"></div>
   <div class="podium" id="podium"></div>
   <div class="controls-header">
     <div class="section-title"><h2>Classificação Geral</h2><div class="badge">PONTOS</div></div>
@@ -710,6 +728,15 @@
 
   <!-- Conteúdo dinâmico -->
   <div id="hist-content"></div>
+</div>
+
+<!-- POTW: jogador da semana de cada pelada -->
+<div id="tab-potw" class="tab-panel">
+  <div class="controls-header">
+    <div class="section-title"><h2>POTW</h2><div class="badge">JOGADOR DA SEMANA</div></div>
+    <span class="count-label" id="potw-count"></span>
+  </div>
+  <div id="potw-content"></div>
 </div>
 
 <!-- PÁGINA DO JOGADOR (aberta pela Classificação) -->
@@ -2019,7 +2046,7 @@ function _finalizarSalvar(finalResults, goalsSnapshot, assistsSnapshot, dataSnap
   salvarPeladaNoBanco(payload, (res) => {
     resetarInterfacePosPelada();
     mostrarResumoPelada(res.gols || goalsSnapshot, res.assists || assistsSnapshot, finalResults, dataSnapshot);
-    carregarDados(true);
+    carregarDados(true).then(() => preencherPotwResumo(dataSnapshot));
   });
 }
 
@@ -2090,6 +2117,11 @@ function mostrarResumoPelada(goals, assists, results, data) {
       ${garcons.length ? `<div style="font-weight:700;font-size:1rem;color:var(--yellow)">${garcons.join(' · ')}</div>
         <div style="font-family:'Space Mono',monospace;font-size:0.72rem;color:var(--muted);margin-top:0.2rem">${maxAssists} assistência${maxAssists>1?'s':''}</div>`
         : '<div style="color:var(--muted);font-size:0.85rem">Nenhuma assistência registrada</div>'}
+    </div>
+
+    <!-- Jogador da semana (preenchido quando os dados do banco recarregam) -->
+    <div id="resumo-potw" style="background:var(--surface);border-radius:10px;padding:0.9rem 1rem;margin-bottom:1rem">
+      <div class="pj-empty">👑 Calculando o jogador da semana…</div>
     </div>
   `;
   document.getElementById('modal-resumo').classList.add('open');
@@ -2193,6 +2225,7 @@ function renderPodium() {
 }
 
 function renderRanking() {
+  const bn = document.getElementById('potw-banner'); if (bn) bn.innerHTML = potwBannerHtml();
   const sorted = [...rankingData].sort((a,b)=>b.pts-a.pts||b.pct-a.pct);
   const tbody = document.getElementById('ranking-body');
   
@@ -2213,7 +2246,7 @@ function renderRanking() {
 
     return `<tr class="${rowClass}" data-name="${r.name.toLowerCase()}">
       <td class="left rank-cell ${rankClass}">${i+1}°</td>
-      <td class="left"><span class="name-wrap"><span class="player-name">${linkJogador(r.name)}</span>${varPos('ranking', r.name, i)}</span></td>
+      <td class="left"><span class="name-wrap"><span class="player-name">${linkJogador(r.name)}</span>${coroa(r.name)}${varPos('ranking', r.name, i)}</span></td>
       <td class="num"><span class="pts">${r.pts}</span></td>
       <td class="num stat-col">${r.j}</td>
       <td class="num stat-col stat-v">${r.v}</td>
@@ -2480,6 +2513,7 @@ function aplicarDados(data) {
   if (data.goleiroStats)     { goleiroStats = data.goleiroStats; }
   posAnterior = data.posAnterior || null;
   overallCache = null;
+  potwCache = null;
   if (data.jogadores) {
     const nomes = new Set([...allPlayers, ...data.jogadores]);
     allPlayers.length = 0;
@@ -2535,6 +2569,7 @@ function initLocal() {
   renderHistorico();
   renderDestaques();
   renderGoleirosTab();
+  renderPotw();
   rotaJogador();
   setTimeout(()=>{
     document.querySelectorAll('.bar-fill').forEach(b=>{
@@ -2781,8 +2816,14 @@ async function gerarImagemCard(d) {
   ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
   ctx.fillStyle = '#fff'; ctx.font = '44px "Black Han Sans", "DM Sans", sans-serif';
   ctx.fillText('PELADA DE QUINTA', 150, 72);
-  ctx.fillStyle = '#00D96F'; ctx.font = '700 20px "Space Mono", monospace';
-  ctx.fillText('CAIÇARAS · CARD DO JOGADOR', 152, 100);
+  if (d.potw) {
+    desenharCoroa(ctx, 152, 80, 26, '#FFD600');
+    ctx.fillStyle = '#FFD600'; ctx.font = '700 20px "Space Mono", monospace';
+    ctx.fillText(`JOGADOR DA SEMANA · ${dataCurta(d.potw.data)}`, 188, 100);
+  } else {
+    ctx.fillStyle = '#00D96F'; ctx.font = '700 20px "Space Mono", monospace';
+    ctx.fillText('CAIÇARAS · CARD DO JOGADOR', 152, 100);
+  }
 
   // card
   const cx0 = 80, cy0 = 130, cw = W - 160, ch = 1110;
@@ -2795,7 +2836,7 @@ async function gerarImagemCard(d) {
   ctx.strokeStyle = 'rgba(255,255,255,0.035)'; ctx.lineWidth = 4;
   for (let x = -ch; x < cw + ch; x += 30) { ctx.beginPath(); ctx.moveTo(cx0 + x, cy0); ctx.lineTo(cx0 + x + ch * 0.47, cy0 + ch); ctx.stroke(); }
   ctx.restore();
-  rrect(ctx, cx0, cy0, cw, ch, 40); ctx.strokeStyle = ta; ctx.lineWidth = 3; ctx.stroke();
+  rrect(ctx, cx0, cy0, cw, ch, 40); ctx.strokeStyle = d.potw ? '#FFD600' : ta; ctx.lineWidth = d.potw ? 5 : 3; ctx.stroke();
 
   // overall
   ctx.fillStyle = tc; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
@@ -2847,7 +2888,9 @@ async function gerarImagemCard(d) {
   // estatísticas
   const sy = cy0 + ch - 150;
   ctx.fillStyle = 'rgba(0,0,0,0.25)'; rrect(ctx, cx0 + 40, sy, cw - 80, 115, 22); ctx.fill();
-  const st = [[d.r.j, 'JOGOS'], [d.r.pts, 'PONTOS'], [(d.r.pct * 100).toFixed(0) + '%', 'APROV.'], [d.gols, 'GOLS'], [d.assists, 'ASSIST.']];
+  const st = d.potw
+    ? [[d.potw.res, 'RESULTADO'], [d.potw.g, 'GOLS'], [d.potw.a, 'ASSIST.'], [fmtNota(d.potw.nota), 'NOTA'], [d.potw.pos, 'POSIÇÃO']]
+    : [[d.r.j, 'JOGOS'], [d.r.pts, 'PONTOS'], [(d.r.pct * 100).toFixed(0) + '%', 'APROV.'], [d.gols, 'GOLS'], [d.assists, 'ASSIST.']];
   const colW = (cw - 80) / st.length;
   st.forEach(([v, l], i) => {
     const x = cx0 + 40 + colW * (i + 0.5);
@@ -2979,6 +3022,7 @@ function renderJogador(nome) {
       <div>
         <div class="pj-block pj-radar-box"><h3>Atributos do overall</h3>${radarSvg(attrs, pesos, !!ov)}</div>
         <div class="pj-stats">
+          ${S('👑 ' + getPotw().filter(p => p.nome === nome).length, 'Jogador da semana')}
           ${S(r.j, 'Peladas jogadas')}
           ${S(r.pts, 'Pontos', 'g')}
           ${S((r.pct * 100).toFixed(1).replace('.', ',') + '%', 'Aproveitamento')}
@@ -3016,6 +3060,270 @@ function renderJogador(nome) {
         </ul>
         <p style="margin-top:0.6rem">Quem joga em posições diferentes tem os pesos misturados conforme as peladas em cada posição. Faltar não muda os outros atributos, só derruba a assiduidade. Até ${OVR_CFG.MIN_JOGOS} peladas jogadas o overall é provisório e puxado para a média do grupo.</p>
       </details>
+    </div>`;
+}
+
+// ============================================================
+// JOGADOR DA SEMANA (POTW)
+// Nota do dia (0-10) só com o que aconteceu naquela pelada. O bônus do
+// resultado é multiplicado pelo peso de RES da posição escalada (ZAG/LAT
+// 50% ÷ ATA/MEI 35% = ×1,43), igual ao overall. Gols e assistências valem o
+// mesmo para todos, com retorno decrescente (somam no máximo +3,2), para que
+// um dia de 6 gols não empate em 10 com um de 3.
+// Desempate: resultado, G+A, gols, overall do dia, nome.
+// ============================================================
+const NOTA_CFG = { base: 6.0, V: 1.2, E: 0.3, D: -0.6, gol: 0.55, assist: 0.4, tetoGA: 3.2, curvaGA: 2.2 };
+const POS_ORDEM = { ZAG: 0, LAT: 1, MEI: 2, ATA: 3 };
+let potwCache = null;
+
+function notaDoDia(res, g, a, pos) {
+  const grupo = OVR_CFG.GRUPO[pos] || 'OF';
+  const mult = OVR_CFG.PESOS[grupo].RES / OVR_CFG.PESOS.OF.RES;
+  const ga = NOTA_CFG.gol * g + NOTA_CFG.assist * a;
+  const n = NOTA_CFG.base + (NOTA_CFG[res] || 0) * mult + NOTA_CFG.tetoGA * (1 - Math.exp(-ga / NOTA_CFG.curvaGA));
+  return Math.round(Math.max(3, Math.min(10, n)) * 10) / 10;
+}
+function calcularPotw(hist, ovs) {
+  const lista = [];
+  if (!ovs.inicio) return lista;
+  const t0 = hist.findIndex(p => p.data === ovs.inicio);
+  for (let t = Math.max(0, t0); t < hist.length; t++) {
+    const pel = hist[t], gols = pel.gols || {}, assists = pel.assists || {};
+    const cands = (pel.jogadores || []).map(x => {
+      const reg = (ovs.jogadores[x.name]?.serie || []).find(s => s.t === t) || {};
+      const pos = reg.pos || x.pos || 'MEI';
+      const g = +gols[x.name] || 0, a = +assists[x.name] || 0;
+      return { t, data: pel.data, nome: x.name, pos, time: x.time, res: x.res, g, a,
+               nota: notaDoDia(x.res, g, a, pos), ovr: reg.ovr ?? null };
+    });
+    if (!cands.length) continue;
+    const pr = { V: 2, E: 1, D: 0 };
+    cands.sort((x, y) => y.nota - x.nota || pr[y.res] - pr[x.res] || (y.g + y.a) - (x.g + x.a) ||
+                          y.g - x.g || (y.ovr || 0) - (x.ovr || 0) || x.nome.localeCompare(y.nome));
+    lista.push(cands[0]);
+  }
+  return lista;
+}
+function getPotw() {
+  if (!potwCache) potwCache = calcularPotw(historicoPeladas, getOveralls());
+  return potwCache;
+}
+// dono atual da coroa: POTW da última pelada encerrada
+function potwAtual() {
+  const l = getPotw(), u = l[l.length - 1];
+  return u && u.t === historicoPeladas.length - 1 ? u : null;
+}
+function coroa(nome) {
+  const p = potwAtual();
+  return p && p.nome === nome ? `<span class="potw-crown" title="Jogador da semana (${escHtml(dataCurta(p.data))})">👑</span>` : '';
+}
+function fmtNota(n) { return n.toFixed(1).replace('.', ','); }
+const RES_NOME = { V: 'Vitória', E: 'Empate', D: 'Derrota' };
+
+function potwBannerHtml() {
+  const p = potwAtual();
+  if (!p) return '';
+  return `<div class="potw-banner">
+    <div class="potw-b-av">${avatarJogador(p.nome)}</div>
+    <div class="potw-b-info">
+      <div class="potw-b-tit">👑 Jogador da semana · ${escHtml(dataCurta(p.data))}</div>
+      <div class="potw-b-nome">${linkJogador(p.nome)} <span class="pos-badge pos-${p.pos.toLowerCase()}">${p.pos}</span></div>
+      <div class="potw-b-stats">Nota <b>${fmtNota(p.nota)}</b> · ${RES_NOME[p.res]} · ${p.g} G · ${p.a} A</div>
+    </div>
+    <div class="potw-b-acoes">
+      <button class="pj-back pj-share" onclick="compartilharResultado(${p.t}, this)">📤 Resultado</button>
+      <button class="pj-back pj-share" onclick="compartilharCardPotw(${p.t}, this)">👑 Card</button>
+    </div>
+  </div>`;
+}
+
+function renderPotw() {
+  const el = document.getElementById('potw-content');
+  if (!el) return;
+  const l = getPotw();
+  updateCount('potw-count', new Set(l.map(p => p.nome)).size);
+  if (!l.length) {
+    el.innerHTML = `<div class="pj-block"><p class="pj-empty">O primeiro jogador da semana sai quando a próxima pelada for encerrada.</p></div>`;
+    return;
+  }
+  const atual = potwAtual();
+  el.innerHTML = `<div class="table-wrap"><table class="potw-table">
+    <thead><tr><th class="left">Data</th><th class="left">Jogador</th><th class="center">Posição</th>
+      <th class="center">Stats</th><th class="num">Nota</th><th class="num">Overall</th></tr></thead>
+    <tbody>${[...l].reverse().map(p => `<tr${atual && p.t === atual.t ? ' class="potw-atual"' : ''}>
+      <td class="left" style="font-family:'Space Mono',monospace;font-size:0.8rem;color:var(--text-muted)">${escHtml(p.data)}</td>
+      <td class="left"><span class="name-wrap"><span class="player-name">${linkJogador(p.nome)}</span>${atual && p.t === atual.t ? '<span class="potw-crown">👑</span>' : ''}</span></td>
+      <td class="center"><span class="pos-badge pos-${p.pos.toLowerCase()}">${p.pos}</span></td>
+      <td class="center"><span class="potw-stats"><span class="rb rb-${p.res}">${p.res}</span><span>⚽ ${p.g}</span><span>🎯 ${p.a}</span></span></td>
+      <td class="num"><span class="pts">${fmtNota(p.nota)}</span></td>
+      <td class="num">${p.ovr ?? '–'}</td>
+    </tr>`).join('')}</tbody></table></div>
+    <p class="pj-empty" style="margin-top:1rem">A nota do dia vai de 0 a 10 e considera só aquela pelada: parte de 6,0, soma o resultado (V +1,2 · E +0,3 · D −0,6, multiplicado por 1,43 para ZAG/LAT, que têm peso maior em resultados no overall) e a participação em gols (gol vale mais que assistência; soma até +3,2, com cada gol a mais valendo um pouco menos). Pode ser de qualquer posição. O overall é o do jogador logo após aquela pelada.</p>`;
+}
+
+// ---------- dados do card de qualquer jogador (para compartilhar fora da página dele) ----------
+function dadosCard(nome) {
+  const r = rankingData.find(x => x.name === nome);
+  if (!r) return null;
+  const ov = getOveralls().jogadores[nome];
+  const ovr = ov ? ov.atual.ovr : '–';
+  const [tierCls, tierNome] = ov ? tierOverall(ovr) : ['', 'Sem overall'];
+  return { nome, ovr, attrs: ov ? ov.atual.attrs : {}, pesos: ov ? ov.atual.pesos : {}, tierCls, tierNome,
+           prov: !!ov && ov.atual.j < OVR_CFG.MIN_JOGOS, principal: ov ? ov.atual.principal : null, temOverall: !!ov, r,
+           gols: (artilhariaData.find(x => x.name === nome) || {}).gols || 0,
+           assists: (assistenciasData.find(x => x.name === nome) || {}).assists || 0 };
+}
+
+async function compartilharImagem(gerar, nomeArq, titulo, btn) {
+  const txt = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Gerando…'; }
+  try {
+    const blob = await gerar();
+    const file = new File([blob], nomeArq, { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: titulo }); }
+      catch (e) { if (e.name !== 'AbortError') throw e; }
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = nomeArq;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      showNotif('🖼 Imagem baixada.');
+    }
+  } catch (e) {
+    console.error(e); showNotif('⚠ Não foi possível gerar a imagem.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = txt; }
+  }
+}
+function slugArq(s) { return s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase(); }
+function compartilharCardPotw(t, btn) {
+  const p = getPotw().find(x => x.t === t);
+  const d = p && dadosCard(p.nome);
+  if (!d) return;
+  d.potw = p;
+  compartilharImagem(() => gerarImagemCard(d), `potw-${slugArq(p.data)}-${slugArq(p.nome)}.png`, `Jogador da semana · ${p.nome}`, btn);
+}
+function compartilharResultado(t, btn) {
+  const pel = historicoPeladas[t];
+  if (!pel) return;
+  compartilharImagem(() => gerarImagemResultado(t), `resultado-${slugArq(pel.data)}.png`, `Pelada ${pel.data}`, btn);
+}
+
+function desenharCoroa(ctx, x, y, w, cor) {   // coroa simples (sem depender de emoji)
+  const h = w * 0.7;
+  ctx.beginPath();
+  ctx.moveTo(x, y + h); ctx.lineTo(x, y + h * 0.25); ctx.lineTo(x + w * 0.27, y + h * 0.55);
+  ctx.lineTo(x + w * 0.5, y); ctx.lineTo(x + w * 0.73, y + h * 0.55); ctx.lineTo(x + w, y + h * 0.25);
+  ctx.lineTo(x + w, y + h); ctx.closePath(); ctx.fillStyle = cor; ctx.fill();
+}
+
+async function gerarImagemResultado(t) {
+  try { await Promise.all(['60px "Black Han Sans"', '700 40px "DM Sans"', '700 26px "Space Mono"'].map(f => document.fonts.load(f))); } catch (e) {}
+  const pel = historicoPeladas[t];
+  const p = getPotw().find(x => x.t === t);
+  const W = 1080, H = 1350;
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d');
+  const [logo, fotoP] = await Promise.all([carregarImg('/img/logo.png'), carregarImg(p ? FOTOS_JOGADORES[p.nome] : null)]);
+  ctx.fillStyle = '#0a0d13'; ctx.fillRect(0, 0, W, H);
+  const gl = ctx.createRadialGradient(W / 2, 0, 50, W / 2, 0, 900);
+  gl.addColorStop(0, 'rgba(0,217,111,0.14)'); gl.addColorStop(1, 'rgba(0,217,111,0)');
+  ctx.fillStyle = gl; ctx.fillRect(0, 0, W, H);
+  if (logo) ctx.drawImage(logo, 60, 40, 90, 90);
+  ctx.textAlign = 'left'; ctx.fillStyle = '#fff'; ctx.font = '52px "Black Han Sans", "DM Sans", sans-serif';
+  ctx.fillText('RESULTADO DA PELADA', 175, 95);
+  ctx.fillStyle = '#00D96F'; ctx.font = '700 26px "Space Mono", monospace';
+  ctx.fillText(`CAIÇARAS · ${pel.data}`, 178, 130);
+
+  const cores = { red: '#FF4757', yellow: '#FFD600', blue: '#4A9EFF' };
+  const nomes = { red: 'VERMELHO', yellow: 'AMARELO', blue: 'AZUL' };
+  const resCor = { V: '#00D96F', E: '#8b9ab3', D: '#FF4757' };
+  const ordem = { V: 0, E: 1, D: 2 };
+  const times = {};
+  (pel.jogadores || []).forEach(x => { const k = x.time || ('_' + x.res); (times[k] = times[k] || { res: x.res, js: [] }).js.push(x); });
+  const lista = Object.entries(times).sort((a, b) => ordem[a[1].res] - ordem[b[1].res]);
+  const gols = pel.gols || {}, assists = pel.assists || {};
+  const bh = 285, gap = 18; let y = 175;
+  lista.forEach(([cor, tm]) => {
+    const c = cores[cor] || '#8b9ab3';
+    ctx.fillStyle = '#131722'; rrect(ctx, 60, y, W - 120, bh, 24); ctx.fill();
+    ctx.strokeStyle = '#1a1f2c'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = c; rrect(ctx, 60, y, 12, bh, 6); ctx.fill();
+    ctx.beginPath(); ctx.arc(120, y + 52, 16, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = '700 36px "DM Sans", sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText(nomes[cor] ? 'TIME ' + nomes[cor] : ({ V: 'VENCEDORES', E: 'EMPATE', D: 'DERROTA' })[tm.res] || '—', 150, y + 65);
+    ctx.fillStyle = resCor[tm.res] || '#fff'; ctx.textAlign = 'right';
+    ctx.font = '64px "Black Han Sans", "DM Sans", sans-serif'; ctx.fillText(tm.res || '', W - 100, y + 78);
+    tm.js.sort((a, b) => (POS_ORDEM[a.pos] ?? 9) - (POS_ORDEM[b.pos] ?? 9) || a.name.localeCompare(b.name));
+    tm.js.forEach((x, i) => {
+      const col = i % 2, row = Math.floor(i / 2);
+      const px = 100 + col * 450, py = y + 130 + row * 52;
+      if (x.pos) {
+        ctx.fillStyle = 'rgba(255,255,255,0.06)'; rrect(ctx, px, py - 30, 74, 40, 8); ctx.fill();
+        ctx.fillStyle = POS_CORES[x.pos]; ctx.font = '700 20px "Space Mono", monospace'; ctx.textAlign = 'center';
+        ctx.fillText(x.pos, px + 37, py - 3);
+      }
+      ctx.fillStyle = p && p.nome === x.name ? '#FFD600' : '#e8edf2'; ctx.textAlign = 'left';
+      ctx.font = '600 30px "DM Sans", sans-serif';
+      let nm = x.name; while (ctx.measureText(nm).width > 230 && nm.length > 3) nm = nm.slice(0, -1);
+      if (nm !== x.name) nm = nm.slice(0, -1) + '…';
+      ctx.fillText(nm, px + 90, py);
+      const wNm = ctx.measureText(nm).width;
+      const extra = [(+gols[x.name] ? `${gols[x.name]}G` : ''), (+assists[x.name] ? `${assists[x.name]}A` : '')].filter(Boolean).join(' ');
+      if (extra) { ctx.fillStyle = '#00D96F'; ctx.font = '700 24px "Space Mono", monospace'; ctx.fillText(extra, px + 90 + wNm + 14, py); }
+    });
+    y += bh + gap;
+  });
+
+  // faixa do jogador da semana
+  if (p) {
+    const fy = Math.max(y + 5, 1090), fh = 150;
+    ctx.fillStyle = 'rgba(255,214,0,0.08)'; rrect(ctx, 60, fy, W - 120, fh, 24); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,214,0,0.5)'; ctx.lineWidth = 2; ctx.stroke();
+    const ax = 150, ay = fy + fh / 2, ar = 52;
+    ctx.save(); ctx.beginPath(); ctx.arc(ax, ay, ar, 0, Math.PI * 2); ctx.fillStyle = '#1d1806'; ctx.fill(); ctx.clip();
+    if (fotoP) { const s = Math.min(fotoP.width, fotoP.height); ctx.drawImage(fotoP, (fotoP.width - s) / 2, (fotoP.height - s) / 2, s, s, ax - ar, ay - ar, ar * 2, ar * 2); }
+    else { ctx.fillStyle = '#ffeaa0'; ctx.font = '44px "Black Han Sans", "DM Sans", sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(iniciaisJogador(p.nome), ax, ay + 3); ctx.textBaseline = 'alphabetic'; }
+    ctx.restore();
+    ctx.beginPath(); ctx.arc(ax, ay, ar, 0, Math.PI * 2); ctx.strokeStyle = '#FFD600'; ctx.lineWidth = 4; ctx.stroke();
+    desenharCoroa(ctx, 230, fy + 30, 34, '#FFD600');
+    ctx.textAlign = 'left'; ctx.fillStyle = '#FFD600'; ctx.font = '700 22px "Space Mono", monospace';
+    ctx.fillText('JOGADOR DA SEMANA', 276, fy + 52);
+    ctx.fillStyle = '#fff'; ctx.font = '700 44px "DM Sans", sans-serif'; ctx.fillText(p.nome, 230, fy + 102);
+    ctx.fillStyle = '#8b9ab3'; ctx.font = '600 24px "DM Sans", sans-serif';
+    ctx.fillText(`${p.pos} · ${RES_NOME[p.res]} · ${p.g} gol${p.g === 1 ? '' : 's'} · ${p.a} assist.`, 230, fy + 134);
+    ctx.textAlign = 'right'; ctx.fillStyle = '#FFD600'; ctx.font = '72px "Black Han Sans", "DM Sans", sans-serif';
+    ctx.fillText(fmtNota(p.nota), W - 100, fy + 100);
+    ctx.font = '700 18px "Space Mono", monospace'; ctx.fillText('NOTA', W - 100, fy + 128);
+  }
+  ctx.fillStyle = '#5e6b82'; ctx.font = '600 22px "DM Sans", sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('pelada-caicaras.vercel.app', W / 2, H - 30);
+  return new Promise(res => cv.toBlob(res, 'image/png'));
+}
+
+// bloco do jogador da semana no resumo que aparece ao encerrar a pelada
+function preencherPotwResumo(dataSnapshot) {
+  const el = document.getElementById('resumo-potw');
+  if (!el) return;
+  const alvo = dataSnapshot && dataSnapshot.dia && dataSnapshot.mes
+    ? String(dataSnapshot.dia).padStart(2, '0') + '/' + String(dataSnapshot.mes).padStart(2, '0') : null;
+  const t = historicoPeladas.length - 1;
+  const pel = historicoPeladas[t];
+  const p = getPotw().find(x => x.t === t);
+  if (!pel || (alvo && dataCurta(pel.data) !== alvo) || !p) {
+    el.innerHTML = '<div class="pj-empty">O jogador da semana aparece na aba 👑 POTW assim que os dados atualizarem.</div>';
+    return;
+  }
+  el.innerHTML = `<div class="potw-resumo">
+      <div class="potw-b-av">${avatarJogador(p.nome)}</div>
+      <div><div class="potw-b-tit">👑 Jogador da semana</div>
+        <div class="potw-b-nome">${escHtml(p.nome)} <span class="pos-badge pos-${p.pos.toLowerCase()}">${p.pos}</span></div>
+        <div class="potw-b-stats">Nota <b>${fmtNota(p.nota)}</b> · ${RES_NOME[p.res]} · ${p.g} G · ${p.a} A</div></div>
+    </div>
+    <div style="display:flex;gap:0.5rem;margin-top:0.75rem">
+      <button class="pj-back pj-share" style="flex:1;justify-content:center" onclick="compartilharResultado(${t}, this)">📤 Resultado</button>
+      <button class="pj-back pj-share" style="flex:1;justify-content:center" onclick="compartilharCardPotw(${t}, this)">👑 Card do jogador</button>
     </div>`;
 }
 
