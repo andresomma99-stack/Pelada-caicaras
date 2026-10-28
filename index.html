@@ -333,6 +333,71 @@
   footer strong { color:var(--green); }
 
   @media(max-width:600px){ .header-stats{display:none} .logo-text h1{font-size:1.4rem} main{padding:1rem} .podium{gap:0.4rem} .podium-block{width:60px} .tab-bar-inner{padding:0 0.5rem} }
+
+  /* ===== CARD DO JOGADOR ===== */
+  .player-link { color:#fff; text-decoration:none; font-weight:700; border-bottom:1px dashed rgba(255,255,255,0.25); transition:color .15s, border-color .15s; }
+  .player-link:hover { color:var(--green); border-color:var(--green); }
+  .podium-name .player-link { border-bottom:none; }
+  .podium-avatar { overflow:hidden; } .podium-avatar img { width:100%; height:100%; object-fit:cover; }
+  .pj-back { display:inline-flex; align-items:center; gap:6px; background:var(--surface); border:1px solid var(--dark3); color:var(--text-muted); font-family:'DM Sans',sans-serif; font-weight:600; font-size:0.82rem; padding:0.5rem 0.9rem; border-radius:8px; cursor:pointer; margin-bottom:1.5rem; }
+  .pj-back:hover { color:#fff; border-color:var(--green); }
+  .pj-hero { display:grid; grid-template-columns:300px 1fr; gap:1.5rem; align-items:start; }
+  @media(max-width:820px){ .pj-hero { grid-template-columns:1fr; } }
+
+  .pj-card { --t1:#3a4152; --t2:#1a1f2c; --tc:#e8edf2; --ta:rgba(255,255,255,0.12);
+    position:relative; border-radius:18px; padding:1.4rem 1.3rem 1.2rem; overflow:hidden; max-width:320px; width:100%; margin:0 auto;
+    background:linear-gradient(160deg, var(--t1) 0%, var(--t2) 70%); border:1px solid var(--ta); color:var(--tc);
+    box-shadow:0 18px 40px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08); }
+  .pj-card::before { content:''; position:absolute; inset:0; background:repeating-linear-gradient(115deg, rgba(255,255,255,0.035) 0 2px, transparent 2px 14px); pointer-events:none; }
+  .pj-card.tier-elite  { --t1:#0f5c3a; --t2:#06150f; --tc:#d9ffe9; --ta:rgba(0,217,111,0.55); box-shadow:0 18px 40px rgba(0,0,0,0.45), 0 0 30px rgba(0,217,111,0.18); }
+  .pj-card.tier-ouro   { --t1:#6b5410; --t2:#1d1806; --tc:#ffeaa0; --ta:rgba(255,214,0,0.5); }
+  .pj-card.tier-prata  { --t1:#4e5666; --t2:#171b24; --tc:#e3e8ef; --ta:rgba(192,192,192,0.45); }
+  .pj-card.tier-bronze { --t1:#5e3a1c; --t2:#1a1009; --tc:#f1c9a1; --ta:rgba(205,127,50,0.45); }
+  .pj-top { display:flex; justify-content:space-between; align-items:flex-start; position:relative; }
+  .pj-ovr { font-family:'Black Han Sans',sans-serif; font-size:3.6rem; line-height:0.9; }
+  .pj-ovr-lbl { font-family:'Space Mono',monospace; font-size:0.62rem; letter-spacing:0.2em; opacity:0.75; margin-top:4px; }
+  .pj-tier { font-family:'Space Mono',monospace; font-size:0.6rem; letter-spacing:0.14em; text-transform:uppercase; padding:3px 7px; border-radius:5px; border:1px solid var(--ta); }
+  .pj-prov { display:block; margin-top:6px; font-family:'Space Mono',monospace; font-size:0.55rem; letter-spacing:0.1em; opacity:0.8; text-align:right; }
+  .pj-avatar { width:112px; height:112px; border-radius:50%; margin:0.4rem auto 0.8rem; display:flex; align-items:center; justify-content:center; position:relative;
+    font-family:'Black Han Sans',sans-serif; font-size:2.6rem; letter-spacing:0.04em; color:var(--tc); background:rgba(0,0,0,0.28); border:3px solid var(--ta); overflow:hidden; }
+  .pj-avatar img { width:100%; height:100%; object-fit:cover; }
+  .pj-name { text-align:center; font-family:'DM Sans',sans-serif; font-weight:700; font-size:1.35rem; text-transform:uppercase; letter-spacing:0.02em; position:relative; }
+  .pj-sep { height:1px; background:var(--ta); margin:0.8rem 0; position:relative; }
+  .pj-attrs { display:grid; grid-template-columns:1fr 1fr; gap:0.35rem 1.2rem; position:relative; }
+  .pj-attr { display:flex; align-items:center; gap:0.5rem; font-size:0.85rem; }
+  .pj-attr b { font-family:'Space Mono',monospace; font-size:1rem; min-width:26px; }
+  .pj-attr span { font-family:'Space Mono',monospace; font-size:0.68rem; letter-spacing:0.08em; opacity:0.8; }
+
+  .pj-stats { display:grid; grid-template-columns:repeat(auto-fill, minmax(130px,1fr)); gap:0.75rem; }
+  .pj-stat { background:var(--dark2); border:1px solid var(--dark3); border-radius:12px; padding:0.85rem 1rem; }
+  .pj-stat-val { font-family:'Space Mono',monospace; font-size:1.35rem; font-weight:700; color:#fff; }
+  .pj-stat-val.g { color:var(--green); } .pj-stat-val.r { color:var(--loss); }
+  .pj-stat-lbl { font-size:0.68rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em; font-weight:600; margin-top:2px; }
+  .pj-block { background:var(--dark2); border:1px solid var(--dark3); border-radius:12px; padding:1.1rem 1.2rem; margin-top:1.5rem; }
+  .pj-block h3 { font-size:0.8rem; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-muted); margin-bottom:0.9rem; font-weight:700; }
+  .pj-extremos { display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-bottom:1rem; }
+  .pj-ext { border-radius:10px; padding:0.8rem 1rem; display:flex; align-items:center; gap:0.9rem; }
+  .pj-ext.max { background:rgba(0,217,111,0.08); border:1px solid rgba(0,217,111,0.35); }
+  .pj-ext.min { background:rgba(255,71,87,0.08); border:1px solid rgba(255,71,87,0.35); }
+  .pj-ext-val { font-family:'Black Han Sans',sans-serif; font-size:2rem; line-height:1; }
+  .pj-ext.max .pj-ext-val { color:var(--green); } .pj-ext.min .pj-ext-val { color:var(--loss); }
+  .pj-ext-lbl { font-size:0.68rem; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-muted); font-weight:700; }
+  .pj-ext-data { font-family:'Space Mono',monospace; font-size:0.72rem; color:var(--muted); }
+  .pj-var { display:flex; align-items:center; gap:0.8rem; padding:0.6rem 0; border-bottom:1px solid var(--dark3); font-size:0.85rem; }
+  .pj-var:last-child { border-bottom:none; }
+  .pj-var-data { font-family:'Space Mono',monospace; font-size:0.75rem; color:var(--muted); width:84px; flex-shrink:0; }
+  .pj-var-mov { font-family:'Space Mono',monospace; color:var(--text-muted); flex:1; }
+  .pj-var-mov b { color:#fff; }
+  .pj-var-tag { font-size:0.62rem; color:var(--muted); border:1px solid var(--dark3); border-radius:4px; padding:1px 5px; margin-left:6px; text-transform:uppercase; letter-spacing:0.05em; }
+  .pj-delta { font-family:'Space Mono',monospace; font-weight:700; font-size:0.8rem; padding:3px 8px; border-radius:6px; min-width:46px; text-align:center; }
+  .pj-delta.up { color:var(--win); background:rgba(0,217,111,0.1); }
+  .pj-delta.down { color:var(--loss); background:rgba(255,71,87,0.1); }
+  .pj-empty { color:var(--muted); font-size:0.85rem; }
+  .pj-forma { display:flex; gap:4px; }
+  .pj-info summary { cursor:pointer; color:var(--text-muted); font-size:0.8rem; font-weight:600; }
+  .pj-info p, .pj-info li { color:var(--text-muted); font-size:0.8rem; line-height:1.55; }
+  .pj-info ul { margin:0.6rem 0 0 1.1rem; }
+  @media(max-width:600px){ .pj-extremos { grid-template-columns:1fr; } .pj-stats { grid-template-columns:repeat(2,1fr); } }
 </style>
 </head>
 <body>
@@ -625,6 +690,11 @@
 
   <!-- Conteúdo dinâmico -->
   <div id="hist-content"></div>
+</div>
+
+<!-- PÁGINA DO JOGADOR (aberta pela Classificação) -->
+<div id="tab-jogador" class="tab-panel">
+  <div id="jogador-content"></div>
 </div>
 
 <!-- DESTAQUES -->
@@ -2094,8 +2164,8 @@ function renderPodium() {
   const heights = [60,80,45];
   document.getElementById('podium').innerHTML = order.map((p,i) =>
     `<div class="podium-item ${classes[i]}">
-      <div class="podium-avatar">${getInitials(p.name)}</div>
-      <div class="podium-name">${p.name}</div>
+      <div class="podium-avatar">${avatarJogador(p.name)}</div>
+      <div class="podium-name">${linkJogador(p.name)}</div>
       <div class="podium-pts">${p.pts} pts</div>
       <div class="podium-block" style="height:${heights[i]}px">${medals[i]}</div>
     </div>`
@@ -2123,7 +2193,7 @@ function renderRanking() {
 
     return `<tr class="${rowClass}" data-name="${r.name.toLowerCase()}">
       <td class="left rank-cell ${rankClass}">${i+1}°</td>
-      <td class="left"><span class="name-wrap"><span class="player-name">${r.name}</span>${varPos('ranking', r.name, i)}</span></td>
+      <td class="left"><span class="name-wrap"><span class="player-name">${linkJogador(r.name)}</span>${varPos('ranking', r.name, i)}</span></td>
       <td class="num"><span class="pts">${r.pts}</span></td>
       <td class="num stat-col">${r.j}</td>
       <td class="num stat-col stat-v">${r.v}</td>
@@ -2239,6 +2309,7 @@ function updateCount(id, n) {
 }
 
 function switchTab(tab, btn) {
+  if (tab !== 'jogador' && location.hash.startsWith('#jogador/')) history.replaceState(null, '', location.pathname + location.search);
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('tab-'+tab).classList.add('active');
@@ -2388,6 +2459,7 @@ function aplicarDados(data) {
   if (data.historicoPeladas) { historicoPeladas.length = 0; historicoPeladas.push(...data.historicoPeladas); }
   if (data.goleiroStats)     { goleiroStats = data.goleiroStats; }
   posAnterior = data.posAnterior || null;
+  overallCache = null;
   if (data.jogadores) {
     const nomes = new Set([...allPlayers, ...data.jogadores]);
     allPlayers.length = 0;
@@ -2443,12 +2515,255 @@ function initLocal() {
   renderHistorico();
   renderDestaques();
   renderGoleirosTab();
+  rotaJogador();
   setTimeout(()=>{
     document.querySelectorAll('.bar-fill').forEach(b=>{
       const w=b.style.width; b.style.width='0';
       setTimeout(()=>b.style.width=w,50);
     });
   },100);
+}
+
+// ============================================================
+// OVERALL (0-99)
+// ============================================================
+const OVR_CFG = {
+  K: 8,                       // jogos "fictícios" na média do grupo (evita overall inflado com poucos jogos)
+  PESO_ASSIST: 0.7,           // assistência vale 70% de um gol
+  PESOS: { RES: 0.35, ATA: 0.30, FOR: 0.15, ASS: 0.10, EXP: 0.10 },
+  JANELA_FORMA: 5, JANELA_ASSID: 10, EXP_TETO: 30, ESTICA: 1.3
+};
+function _clampOvr(x, lo = 25, hi = 99) { return Math.max(lo, Math.min(hi, x)); }
+
+function calcularOveralls(hist, presenca) {
+  const C = OVR_CFG;
+  const presPor = {};
+  (presenca || []).forEach(p => { presPor[p.name] = p.dates || []; });
+  const acc = {};              // acumulado por jogador
+  const lg = { pts: 0, jogos: 0, ga: 0 };
+  const out = {};
+  hist.forEach((pel, t) => {
+    const gols = pel.gols || {}, assists = pel.assists || {};
+    (pel.jogadores || []).forEach(({ name, res }) => {
+      const a = acc[name] || (acc[name] = { j:0, v:0, e:0, d:0, g:0, a:0, jogos:[], t0:t });
+      const g = +gols[name] || 0, as = +assists[name] || 0;
+      const pts = res === 'V' ? 3 : res === 'E' ? 1 : 0;
+      a.j++; a.g += g; a.a += as;
+      if (res === 'V') a.v++; else if (res === 'E') a.e++; else a.d++;
+      a.jogos.push({ t, pts, ga: g + C.PESO_ASSIST * as });
+      lg.pts += pts; lg.jogos++; lg.ga += g + C.PESO_ASSIST * as;
+    });
+    if (!lg.jogos) return;
+    const lgAprov = lg.pts / (3 * lg.jogos);
+    const lgGA = Math.max(lg.ga / lg.jogos, 0.1);
+    const jogaram = new Set((pel.jogadores || []).map(x => x.name));
+    Object.entries(acc).forEach(([name, a]) => {
+      const pts = 3 * a.v + a.e;
+      const aprovAdj = (pts + C.K * 3 * lgAprov) / (3 * (a.j + C.K));
+      const gaTot = a.g + C.PESO_ASSIST * a.a;
+      const gaAdj = (gaTot + C.K * lgGA) / (a.j + C.K);
+      const RES = 70 + 120 * (aprovAdj - lgAprov);
+      const ATA = 70 + 22 * (gaAdj / lgGA - 1);
+      // forma: últimos 5 jogos do próprio jogador (o que faltar é completado com a média do grupo)
+      const ult = a.jogos.slice(-C.JANELA_FORMA);
+      const falta = C.JANELA_FORMA - ult.length;
+      const ptsRate = (ult.reduce((s, x) => s + x.pts, 0) + falta * 3 * lgAprov) / (3 * C.JANELA_FORMA);
+      const gaRate  = (ult.reduce((s, x) => s + x.ga, 0)  + falta * lgGA) / C.JANELA_FORMA;
+      const FOR = 70 + 60 * (ptsRate - lgAprov) + 10 * (gaRate / lgGA - 1);
+      // assiduidade: presença nas últimas 10 peladas
+      const ini = Math.max(0, t - C.JANELA_ASSID + 1);
+      const pd = presPor[name] || [];
+      let soma = 0;
+      for (let k = ini; k <= t; k++) {
+        const p = +pd[k] || 0;
+        const jogou = a.jogos.some(x => x.t === k);
+        soma += p !== 0 ? Math.min(1, p) : (jogou ? 1 : 0);
+      }
+      const ASS = 45 + 54 * Math.max(0, soma) / C.JANELA_ASSID;
+      const EXP = 45 + 54 * Math.min(1, Math.sqrt(a.j / C.EXP_TETO));
+      const at = { RES: _clampOvr(RES), ATA: _clampOvr(ATA), FOR: _clampOvr(FOR), ASS: _clampOvr(ASS), EXP: _clampOvr(EXP) };
+      const P = C.PESOS;
+      const bruto = at.RES*P.RES + at.ATA*P.ATA + at.FOR*P.FOR + at.ASS*P.ASS + at.EXP*P.EXP;
+      const ovr = Math.round(_clampOvr(70 + C.ESTICA * (bruto - 70), 1, 99));
+      const s = out[name] || (out[name] = { serie: [] });
+      s.serie.push({ t, data: pel.data, ovr, j: a.j, jogou: jogaram.has(name) });
+      s.atual = { ovr, attrs: Object.fromEntries(Object.entries(at).map(([k, v]) => [k, Math.round(v)])) };
+    });
+  });
+  return out;
+}
+
+// ============================================================
+// CARD DO JOGADOR + OVERALL
+// O overall é recalculado do zero a cada carga, repassando as peladas em
+// ordem: depois de cada pelada encerrada, todos os jogadores ganham um novo
+// valor. Por isso o histórico de variações se atualiza sozinho toda semana.
+// ============================================================
+const FOTOS_JOGADORES = {};   // futuro: { 'Nome': '/img/jogadores/nome.jpg' }
+let overallCache = null;
+
+function iniciaisJogador(name) {
+  const partes = String(name).normalize('NFC').replace(/[^\p{L}\p{N}\s]/gu, ' ').trim().split(/\s+/).filter(Boolean);
+  if (!partes.length) return '?';
+  if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
+  return (partes[0][0] + partes[1][0]).toUpperCase();
+}
+function avatarJogador(name) {
+  const foto = FOTOS_JOGADORES[name];
+  return foto ? `<img src="${escHtml(foto)}" alt="">` : escHtml(iniciaisJogador(name));
+}
+function linkJogador(name) {
+  return `<a class="player-link" href="#jogador/${encodeURIComponent(name)}">${escHtml(name)}</a>`;
+}
+function getOveralls() {
+  if (!overallCache) overallCache = calcularOveralls(historicoPeladas, presencaData);
+  return overallCache;
+}
+function tierOverall(o) {
+  if (o >= 85) return ['tier-elite', 'Elite'];
+  if (o >= 75) return ['tier-ouro', 'Ouro'];
+  if (o >= 65) return ['tier-prata', 'Prata'];
+  return ['tier-bronze', 'Bronze'];
+}
+function dataCurta(d) { return String(d || '').slice(0, 5); }   // DD/MM/YYYY -> DD/MM
+
+function nomeDaRota() {
+  const m = location.hash.match(/^#jogador\/(.+)$/);
+  if (!m) return null;
+  try { return decodeURIComponent(m[1]); } catch (e) { return null; }
+}
+function rotaJogador() {
+  const nome = nomeDaRota();
+  const painel = document.getElementById('tab-jogador');
+  if (!nome) {
+    if (painel.classList.contains('active')) switchTab('ranking', document.querySelector('.tab-btn'));
+    return;
+  }
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  painel.classList.add('active');
+  renderJogador(nome);
+  window.scrollTo(0, 0);
+}
+function voltarClassificacao() {
+  let veioDoSite = false;
+  try { veioDoSite = !!sessionStorage.getItem('pj_nav'); sessionStorage.removeItem('pj_nav'); } catch (e) {}
+  if (veioDoSite) { history.back(); return; }
+  history.replaceState(null, '', location.pathname + location.search);
+  rotaJogador();
+}
+window.addEventListener('hashchange', rotaJogador);
+document.addEventListener('click', e => { if (e.target.closest && e.target.closest('.player-link')) { try { sessionStorage.setItem('pj_nav', '1'); } catch (x) {} } });
+
+function renderJogador(nome) {
+  const el = document.getElementById('jogador-content');
+  const sorted = [...rankingData].sort((a, b) => b.pts - a.pts || b.pct - a.pct);
+  const pos = sorted.findIndex(r => r.name === nome);
+  const r = sorted[pos];
+  if (!r) {
+    el.innerHTML = rankingData.length
+      ? `<div class="pj-block"><p class="pj-empty">Jogador "${escHtml(nome)}" não encontrado na classificação.</p></div>`
+      : `<div class="pj-block"><p class="pj-empty">Carregando…</p></div>`;
+    return;
+  }
+  const art = artilhariaData.find(x => x.name === nome) || {};
+  const ast = assistenciasData.find(x => x.name === nome) || {};
+  const pre = presencaData.find(x => x.name === nome) || {};
+  const gols = art.gols || 0, assists = ast.assists || 0;
+  const ov = getOveralls()[nome];
+  const ovr = ov ? ov.atual.ovr : '–';
+  const attrs = ov ? ov.atual.attrs : {};
+  const [tierCls, tierNome] = ov ? tierOverall(ovr) : ['', ''];
+  const prov = r.j < 5;
+  const f2 = n => (r.j ? n / r.j : 0).toFixed(2).replace('.', ',');
+  const forma = (r.forma || []).slice(-5).map(f => `<div class="rb rb-${f}">${f}</div>`).join('') || '–';
+
+  // variações: as 5 últimas mudanças de overall
+  let varsHtml = '<p class="pj-empty">Ainda sem variações — o overall muda a partir da próxima pelada.</p>';
+  let extHtml = '';
+  if (ov && ov.serie.length) {
+    const s = ov.serie;
+    const mud = [];
+    for (let i = 1; i < s.length; i++) {
+      const d = s[i].ovr - s[i - 1].ovr;
+      if (d !== 0) mud.push({ ...s[i], de: s[i - 1].ovr, d });
+    }
+    if (mud.length) {
+      varsHtml = mud.slice(-5).reverse().map(m => `
+        <div class="pj-var">
+          <span class="pj-var-data">${escHtml(dataCurta(m.data))}</span>
+          <span class="pj-var-mov">${m.de} → <b>${m.ovr}</b>${m.jogou ? '' : '<span class="pj-var-tag">ausente</span>'}</span>
+          <span class="pj-delta ${m.d > 0 ? 'up' : 'down'}">${m.d > 0 ? '▲ +' : '▼ '}${m.d}</span>
+        </div>`).join('');
+    }
+    // pico e mínimo: só depois de 5 jogos (antes disso o overall ainda é provisório)
+    const base = s.filter(x => x.j >= 5).length ? s.filter(x => x.j >= 5) : s;
+    const mx = base.reduce((a, b) => b.ovr >= a.ovr ? b : a);       // mais recente em caso de empate
+    const mn = base.reduce((a, b) => b.ovr <= a.ovr ? b : a);
+    extHtml = `<div class="pj-extremos">
+      <div class="pj-ext max"><div class="pj-ext-val">${mx.ovr}</div><div><div class="pj-ext-lbl">▲ Mais alto</div><div class="pj-ext-data">${escHtml(mx.data)}</div></div></div>
+      <div class="pj-ext min"><div class="pj-ext-val">${mn.ovr}</div><div><div class="pj-ext-lbl">▼ Mais baixo</div><div class="pj-ext-data">${escHtml(mn.data)}</div></div></div>
+    </div>`;
+  }
+
+  const A = (k, lbl) => `<div class="pj-attr"><b>${attrs[k] ?? '–'}</b><span>${lbl}</span></div>`;
+  const S = (v, lbl, cls = '') => `<div class="pj-stat"><div class="pj-stat-val ${cls}">${v}</div><div class="pj-stat-lbl">${lbl}</div></div>`;
+  el.innerHTML = `
+    <button class="pj-back" onclick="voltarClassificacao()">← Classificação</button>
+    <div class="pj-hero">
+      <div class="pj-card ${tierCls}">
+        <div class="pj-top">
+          <div><div class="pj-ovr">${ovr}</div><div class="pj-ovr-lbl">OVERALL</div></div>
+          <div><span class="pj-tier">${tierNome}</span>${prov ? '<span class="pj-prov">PROVISÓRIO</span>' : ''}</div>
+        </div>
+        <div class="pj-avatar">${avatarJogador(nome)}</div>
+        <div class="pj-name">${escHtml(nome)}</div>
+        <div class="pj-sep"></div>
+        <div class="pj-attrs">
+          ${A('RES', 'RES')}${A('ATA', 'ATA')}
+          ${A('FOR', 'FOR')}${A('ASS', 'ASS')}
+          ${A('EXP', 'EXP')}<div class="pj-attr"><b>${pos + 1}º</b><span>RANK</span></div>
+        </div>
+      </div>
+      <div>
+        <div class="pj-stats">
+          ${S(r.j, 'Peladas jogadas')}
+          ${S(r.pts, 'Pontos', 'g')}
+          ${S((r.pct * 100).toFixed(1).replace('.', ',') + '%', 'Aproveitamento')}
+          ${S(r.v, 'Vitórias', 'g')}
+          ${S(r.e, 'Empates')}
+          ${S(r.d, 'Derrotas', 'r')}
+          ${S(gols, 'Gols')}
+          ${S(assists, 'Assistências')}
+          ${S(gols + assists, 'Gols + assist.')}
+          ${S(f2(gols), 'Gols / pelada')}
+          ${S(f2(assists), 'Assist. / pelada')}
+          ${S(f2(gols + assists), 'G+A / pelada')}
+          ${S(String(pre.anual ?? '–').replace('.', ','), 'Presenças')}
+          ${S(String(pre.u10 ?? '–').replace('.', ',') + '<span style="font-size:.8rem;color:var(--muted)">/10</span>', 'Últimas 10')}
+        </div>
+        <div class="pj-block" style="margin-top:0.75rem"><h3>Forma · últimas 5</h3><div class="pj-forma result-badges" style="justify-content:flex-start">${forma}</div></div>
+      </div>
+    </div>
+    <div class="pj-block">
+      <h3>Variação do overall</h3>
+      ${extHtml}
+      ${varsHtml}
+    </div>
+    <div class="pj-block pj-info">
+      <details>
+        <summary>Como o overall é calculado</summary>
+        <p style="margin-top:0.6rem">Nota de 0 a 99, recalculada depois de cada pelada encerrada. É a média ponderada de 5 atributos:</p>
+        <ul>
+          <li><b>RES · Resultados (35%)</b> — aproveitamento de pontos comparado à média do grupo.</li>
+          <li><b>ATA · Ataque (30%)</b> — gols + assistências por pelada (assistência vale 0,7 gol), comparado à média do grupo.</li>
+          <li><b>FOR · Forma (15%)</b> — resultados e participação em gols nas últimas 5 peladas jogadas.</li>
+          <li><b>ASS · Assiduidade (10%)</b> — presença nas últimas 10 peladas.</li>
+          <li><b>EXP · Experiência (10%)</b> — total de peladas jogadas (máximo a partir de 30).</li>
+        </ul>
+        <p style="margin-top:0.6rem">Quem tem poucas peladas é puxado para a média do grupo, para que uma estreia boa não vire 99. Com menos de 5 peladas o overall aparece como provisório.</p>
+      </details>
+    </div>`;
 }
 
 // ============================================================
