@@ -22,6 +22,9 @@ naquele dia é uma linha em `participacoes` (time, V/E/D, gols, assistências, p
 - A aba Ao Vivo guarda o estado em `peladas.estado` (com controle de versão) e cada gol ou
   assistência em `eventos`. "Desfazer" só marca o evento como anulado.
 - `encerrar_pelada()` grava o dia inteiro de uma vez.
+- **Importar times por foto** (Ao Vivo): o print é lido no próprio celular (Tesseract.js); a cor do
+  rótulo "TIME X" define o time. Nomes em dúvida são confirmados num pop-up e o vínculo vira um
+  apelido em `apelidos` (`get_apelidos()` / `salvar_apelidos()`), reconhecido automaticamente depois.
 - Ninguém escreve nas tabelas diretamente: só por essas funções.
 
 Migrações em `supabase/migrations/`.

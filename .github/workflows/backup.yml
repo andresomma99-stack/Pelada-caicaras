@@ -25,7 +25,7 @@ jobs:
           mkdir -p /tmp/bk/$DIA
           H=(-H "apikey: $SUPABASE_KEY" -H "Content-Type: application/json")
           curl -fsS -X POST "$SUPABASE_URL/rest/v1/rpc/get_dados" "${H[@]}" -d '{}' > /tmp/bk/$DIA/site.json
-          for T in jogadores peladas participacoes goleiros_dia eventos; do
+          for T in jogadores peladas participacoes goleiros_dia eventos apelidos; do
             curl -fsS "$SUPABASE_URL/rest/v1/$T?select=*&limit=100000" "${H[@]}" > /tmp/bk/$DIA/$T.json
           done
           ls -la /tmp/bk/$DIA

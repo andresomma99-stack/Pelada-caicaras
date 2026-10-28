@@ -254,6 +254,22 @@
   /* Modal */
   .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:1000; align-items:center; justify-content:center; padding:1rem; backdrop-filter: blur(4px); }
   .modal-overlay.open { display:flex; }
+  /* Importar times por foto */
+  .btn-foto-times { padding:0.6rem 1.1rem; font-size:0.85rem; }
+  .foto-spinner { width:34px; height:34px; margin:0 auto; border:3px solid var(--dark3); border-top-color:var(--green); border-radius:50%; animation:foto-gira 0.8s linear infinite; }
+  @keyframes foto-gira { to { transform:rotate(360deg); } }
+  .foto-time { border:1px solid var(--dark3); border-left:4px solid var(--muted); border-radius:10px; padding:0.7rem 0.8rem; margin-bottom:0.8rem; background:var(--surface); }
+  .foto-time-red { border-left-color:#FF4757; } .foto-time-yellow { border-left-color:#FFD600; } .foto-time-blue { border-left-color:#4A9EFF; }
+  .foto-time-head { display:flex; align-items:center; gap:0.6rem; margin-bottom:0.5rem; font-family:'Space Mono',monospace; font-size:0.72rem; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-muted); }
+  .foto-qtd { margin-left:auto; }
+  .foto-cor, .foto-sel { background:var(--dark2); border:1px solid var(--dark3); border-radius:7px; padding:0.35rem 0.5rem; color:var(--text); font-family:'DM Sans',sans-serif; font-size:0.85rem; outline:none; }
+  .foto-sel { flex:1; min-width:0; }
+  .foto-alerta { border-color:#FFD600 !important; }
+  .foto-linha { display:flex; align-items:center; gap:0.5rem; padding:0.3rem 0; font-size:0.88rem; }
+  .foto-ok { color:var(--green); font-weight:600; }
+  .foto-lido { color:var(--muted); font-size:0.75rem; font-style:italic; }
+  .foto-lido-duvida { color:#FFD600; font-style:normal; min-width:5.5rem; max-width:7rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .foto-trocar { margin-left:auto; background:none; border:1px solid var(--dark3); border-radius:6px; color:var(--text-muted); font-size:0.75rem; padding:0.1rem 0.45rem; cursor:pointer; }
   .modal { background:var(--dark2); border:1px solid var(--dark3); border-radius:16px; padding:2rem; max-width:480px; width:100%; max-height:85vh; overflow-y:auto; box-shadow:0 10px 30px rgba(0,0,0,0.5);}
   .modal h3 { font-family:'DM Sans',sans-serif; font-size:1.2rem; font-weight:700; margin-bottom:0.5rem; color:#fff; }
   .modal p { font-size:0.85rem; color:var(--muted); margin-bottom:1.2rem; }
@@ -398,7 +414,11 @@
       <h2 style="color:var(--red-team)">Match Center</h2>
       <div class="badge" style="background:rgba(255,71,87,0.12);border-color:rgba(255,71,87,0.3);color:#FF4757">AO VIVO</div>
     </div>
-    <p style="color:var(--muted);font-size:0.85rem;margin-bottom:1.5rem">Selecione 1 ZAG, 2 LAT, 2 MEI e 1 ATA para cada time.</p>
+    <p style="color:var(--muted);font-size:0.85rem;margin-bottom:0.9rem">Selecione 1 ZAG, 2 LAT, 2 MEI e 1 ATA para cada time.</p>
+    <div style="margin-bottom:1.5rem">
+      <button class="btn-secondary btn-foto-times" onclick="abrirSeletorFoto()">📷 Importar times por foto</button>
+      <input type="file" id="foto-times-input" accept="image/*" style="display:none" onchange="processarFotoTimes(this)">
+    </div>
 
     <div class="teams-grid">
       <!-- VERMELHO -->
@@ -695,6 +715,15 @@
         ❌<br><span style="font-size:0.8rem;font-family:'Space Mono',monospace">NÃO</span>
       </button>
     </div>
+  </div>
+</div>
+
+<!-- MODAL IMPORTAR TIMES POR FOTO -->
+<div class="modal-overlay" id="modal-foto-times">
+  <div class="modal" style="max-width:440px">
+    <h3 style="margin-bottom:0.6rem">📷 Times pela foto</h3>
+    <div id="foto-corpo"></div>
+    <div id="foto-acoes" style="display:none;gap:0.8rem;margin-top:1.2rem"></div>
   </div>
 </div>
 
@@ -2792,6 +2821,383 @@ setInterval(enviarFila, 5000);
 setInterval(() => { if (!document.hidden) sincronizarAoVivo(false); }, 15000);
 window.addEventListener('online', () => { enviarFila(); sincronizarAoVivo(true); });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { enviarFila(); sincronizarAoVivo(false); } });
+</script>
+<script>
+// ============================================================
+// IMPORTAR TIMES POR FOTO (OCR no próprio celular, sem servidor)
+// ============================================================
+const OCR_CDN = {
+  lib:    'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js',
+  worker: 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js',
+  core:   'https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.1',
+  lang:   'https://cdn.jsdelivr.net/npm/@tesseract.js-data/por@1.0.0/4.0.0_best_int',
+};
+let fotoImport = null;   // { times: [{label, cor, linhas:[{texto, norm, status, escolha, sugestoes}]}] }
+
+function escHtml(s) {
+  return String(s).replace(/[&<>"'`]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;', '`':'&#96;' }[c]));
+}
+function normNome(s) {
+  return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+    .replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+// ── carregar a biblioteca só quando for usada ─────────────
+let _tessPromise = null;
+function carregarTesseract() {
+  if (window.Tesseract) return Promise.resolve(window.Tesseract);
+  if (_tessPromise) return _tessPromise;
+  _tessPromise = new Promise((ok, erro) => {
+    const s = document.createElement('script');
+    s.src = OCR_CDN.lib;
+    s.onload = () => ok(window.Tesseract);
+    s.onerror = () => { _tessPromise = null; erro(new Error('Não consegui baixar o leitor de foto. Verifique a internet.')); };
+    document.head.appendChild(s);
+  });
+  return _tessPromise;
+}
+
+function abrirSeletorFoto() {
+  const inp = document.getElementById('foto-times-input');
+  inp.value = '';
+  inp.click();
+}
+
+function fotoStatus(msg) {
+  document.getElementById('foto-corpo').innerHTML =
+    `<div style="text-align:center;padding:1.5rem 0">
+       <div class="foto-spinner"></div>
+       <div style="color:var(--text-muted);font-size:0.88rem;margin-top:1rem">${escHtml(msg)}</div>
+     </div>`;
+  document.getElementById('foto-acoes').style.display = 'none';
+}
+function fecharModalFoto() {
+  document.getElementById('modal-foto-times').classList.remove('open');
+  fotoImport = null;
+}
+
+async function arquivoParaCanvas(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((ok, erro) => {
+      const i = new Image();
+      i.onload = () => ok(i);
+      i.onerror = () => erro(new Error('Não consegui abrir essa imagem.'));
+      i.src = url;
+    });
+    const MAX = 2400;
+    const f = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.naturalWidth * f);
+    c.height = Math.round(img.naturalHeight * f);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    return c;
+  } finally { URL.revokeObjectURL(url); }
+}
+
+// versão em preto-no-branco e ampliada, que o OCR lê melhor
+function preprocessar(orig) {
+  const escala = Math.max(1, Math.min(3, 2000 / orig.width));
+  const c = document.createElement('canvas');
+  c.width = Math.round(orig.width * escala);
+  c.height = Math.round(orig.height * escala);
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(orig, 0, 0, c.width, c.height);
+  const im = ctx.getImageData(0, 0, c.width, c.height);
+  const d = im.data;
+  let soma = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    // usa o canal mais forte: texto colorido (vermelho/azul) fica claro como o branco
+    const g = Math.max(d[i], d[i + 1], d[i + 2]);
+    d[i] = g; soma += g;
+  }
+  const media = soma / (d.length / 4);
+  const inverter = media < 128;
+  for (let i = 0; i < d.length; i += 4) {
+    let g = d[i];
+    if (inverter) g = 255 - g;
+    g = Math.max(0, Math.min(255, (g - 128) * 1.6 + 128));
+    d[i] = d[i + 1] = d[i + 2] = g;
+    d[i + 3] = 255;
+  }
+  ctx.putImageData(im, 0, 0);
+  return { canvas: c, escala };
+}
+
+// agrupa as palavras em linhas pela altura (independe de como o OCR separou os blocos)
+function agruparLinhas(words) {
+  const ws = words.filter(w => w.text && w.text.trim()).map(w => ({
+    text: w.text.trim(), conf: w.confidence, b: w.bbox,
+    yc: (w.bbox.y0 + w.bbox.y1) / 2, h: w.bbox.y1 - w.bbox.y0,
+  })).sort((a, b) => a.yc - b.yc);
+  const linhas = [];
+  for (const w of ws) {
+    const l = linhas.find(l => Math.abs(l.yc - w.yc) < Math.max(l.h, w.h) * 0.6);
+    if (l) { l.words.push(w); l.yc = (l.yc * (l.words.length - 1) + w.yc) / l.words.length; l.h = Math.max(l.h, w.h); }
+    else linhas.push({ yc: w.yc, h: w.h, words: [w] });
+  }
+  linhas.forEach(l => l.words.sort((a, b) => a.b.x0 - b.b.x0));
+  return linhas;
+}
+
+// cor predominante (pixels saturados) de uma área da imagem original
+function corDaArea(orig, box) {
+  const x0 = Math.max(0, Math.floor(box.x0)), y0 = Math.max(0, Math.floor(box.y0));
+  const w = Math.min(orig.width - x0, Math.ceil(box.x1 - box.x0)), h = Math.min(orig.height - y0, Math.ceil(box.y1 - box.y0));
+  if (w <= 0 || h <= 0) return null;
+  const d = orig.getContext('2d').getImageData(x0, y0, w, h).data;
+  const votos = { red: 0, yellow: 0, blue: 0 };
+  let coloridos = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i] / 255, g = d[i + 1] / 255, b = d[i + 2] / 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b), delta = max - min;
+    if (max < 0.35 || delta / max < 0.35) continue;    // escuro ou acinzentado
+    let hue;
+    if (max === r) hue = 60 * (((g - b) / delta) % 6);
+    else if (max === g) hue = 60 * ((b - r) / delta + 2);
+    else hue = 60 * ((r - g) / delta + 4);
+    if (hue < 0) hue += 360;
+    coloridos++;
+    if (hue < 25 || hue >= 330) votos.red++;
+    else if (hue >= 40 && hue < 75) votos.yellow++;
+    else if (hue >= 190 && hue < 260) votos.blue++;
+  }
+  const [cor, n] = Object.entries(votos).sort((a, b) => b[1] - a[1])[0];
+  return coloridos >= 8 && n >= coloridos * 0.5 ? cor : null;
+}
+
+// ── semelhança entre nome lido e nome cadastrado ──────────
+function levenshtein(a, b) {
+  if (a === b) return 0;
+  const m = a.length, n = b.length;
+  if (!m) return n; if (!n) return m;
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) {
+    const cur = [i];
+    for (let j = 1; j <= n; j++)
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[n];
+}
+function razao(a, b) { return 1 - levenshtein(a, b) / Math.max(a.length, b.length, 1); }
+function semelhanca(a, b) {          // a = lido, b = cadastrado (ambos normalizados)
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  const pa = a.split(' '), pb = b.split(' ');
+  let s = razao(a, b);
+  if (pb[0] === a) s = Math.max(s, 0.9);                                   // "Dani" → "Dani Walsh"
+  if (pb.includes(a)) s = Math.max(s, 0.86);                               // "Dimba" → "Zé dimba"
+  if (a.length >= 3 && b.startsWith(a)) s = Math.max(s, 0.85);             // "Birma" → "Birmacker"
+  if (b.length >= 3 && a.startsWith(b)) s = Math.max(s, 0.85);             // "Victor Sneijder" → "Victor S"
+  if (pb.length > 1 && a.length === pb.length && a === pb.map(p => p[0]).join('')) s = Math.max(s, 0.8); // "PP" → "Pedro Py"
+  if (pa.length > 1 && pa[0] === pb[0]) s = Math.max(s, 0.75);
+  for (const x of pb) if (x.length >= 3) s = Math.max(s, razao(a, x) * 0.9);
+  return s;
+}
+
+function casarNome(texto, apelidos) {
+  const n = normNome(texto);
+  const exato = allPlayers.find(p => normNome(p) === n);
+  if (exato) return { status: 'certo', escolha: exato, sugestoes: [] };
+  const ap = apelidos[n];
+  if (ap && allPlayers.includes(ap)) return { status: 'certo', escolha: ap, sugestoes: [], viaApelido: true };
+  const ranking = allPlayers.map(p => ({ p, s: semelhanca(n, normNome(p)) }))
+    .filter(x => x.s >= 0.4).sort((a, b) => b.s - a.s).slice(0, 6);
+  const [m1, m2] = ranking;
+  const escolha = m1 && m1.s >= 0.6 && (!m2 || m1.s - m2.s >= 0.05) ? m1.p : '';
+  return { status: 'duvida', escolha, sugestoes: ranking.map(x => x.p) };
+}
+
+async function carregarApelidos() {
+  try {
+    const { data, error } = await sb.rpc('get_apelidos');
+    if (error) throw error;
+    const m = {};
+    (limpar(data) || []).forEach(a => { m[a.apelido] = a.jogador; });
+    return m;
+  } catch (e) { return {}; }
+}
+
+// lê a foto e devolve [{label, cor, nomes:[...]}]
+async function lerFotoTimes(file, progresso) {
+  const orig = await arquivoParaCanvas(file);
+  const { canvas, escala } = preprocessar(orig);
+  progresso('Preparando o leitor…');
+  const T = await carregarTesseract();
+  const worker = await T.createWorker('por', 1, {
+    workerPath: OCR_CDN.worker, corePath: OCR_CDN.core, langPath: OCR_CDN.lang,
+    logger: m => { if (m.status === 'recognizing text') progresso('Lendo a foto… ' + Math.round(m.progress * 100) + '%'); },
+  });
+  let data;
+  try {
+    await worker.setParameters({ preserve_interword_spaces: '1' });
+    ({ data } = await worker.recognize(canvas));
+  } finally { worker.terminate(); }
+
+  const linhas = agruparLinhas(data.words || []);
+  const times = [];
+  for (const l of linhas) {
+    const texto = l.words.map(w => w.text).join(' ');
+    const m = texto.match(/^\W{0,3}T\s*[I1Il|]\s*M\s*E\s*([A-Z0-9])(?:\1|\b)/i);   // tolera "TIME CC:"
+    if (!m) continue;
+    // palavras do rótulo "TIME A:" (até a que tem dois-pontos, no máx. 3)
+    let fim = l.words.findIndex(w => /[:;]$/.test(w.text));
+    if (fim < 0 || fim > 2) fim = /^T[I1Il|]ME[A-Z0-9]/i.test(l.words[0].text) ? 0 : 1;
+    const rot = l.words.slice(0, fim + 1);
+    const box = {
+      x0: Math.min(...rot.map(w => w.b.x0)) / escala, y0: Math.min(...rot.map(w => w.b.y0)) / escala,
+      x1: Math.max(...rot.map(w => w.b.x1)) / escala, y1: Math.max(...rot.map(w => w.b.y1)) / escala,
+    };
+    const resto = l.words.slice(fim + 1).map(w => w.text).join(' ')
+      .replace(/\(?\s*\d+\s*P\s*T\s*S?\s*\)?/gi, ' ')       // "(36 PTS)"
+      .replace(/[()\[\]{}|]/g, ' ');
+    const nomes = resto.split(/[,;]+/).map(s => s.replace(/^[\s.\-_'"]+|[\s.\-_'"]+$/g, '').replace(/\s+/g, ' '))
+      .filter(s => normNome(s).length > 0);
+    times.push({ label: 'Time ' + m[1].toUpperCase(), cor: corDaArea(orig, box), nomes });
+  }
+  return times;
+}
+
+async function processarFotoTimes(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  document.getElementById('modal-foto-times').classList.add('open');
+  fotoStatus('Abrindo a foto…');
+  try {
+    const [times, apelidos] = await Promise.all([lerFotoTimes(file, fotoStatus), carregarApelidos()]);
+    if (!times.length) throw new Error('Não encontrei nenhum "TIME" na foto. Tente um print mais nítido, só com a lista dos times.');
+    // cores repetidas: deixa a pessoa escolher
+    const vistas = {};
+    times.forEach(t => { if (t.cor) vistas[t.cor] = (vistas[t.cor] || 0) + 1; });
+    times.forEach(t => { if (t.cor && vistas[t.cor] > 1) t.cor = null; });
+
+    fotoImport = { times: times.slice(0, 3).map(t => ({
+      label: t.label, cor: t.cor, corDetectada: !!t.cor,
+      linhas: t.nomes.map(texto => ({ texto: limpar(texto), norm: normNome(texto), ...casarNome(texto, apelidos) })),
+    })) };
+    // mesmo jogador reconhecido duas vezes → os dois viram dúvida
+    const cont = {};
+    fotoImport.times.forEach(t => t.linhas.forEach(r => { if (r.escolha) cont[r.escolha] = (cont[r.escolha] || 0) + 1; }));
+    fotoImport.times.forEach(t => t.linhas.forEach(r => {
+      if (r.escolha && cont[r.escolha] > 1) {
+        if (!r.sugestoes.includes(r.escolha)) r.sugestoes.unshift(r.escolha);
+        r.status = 'duvida'; r.escolha = '';
+      }
+    }));
+    renderRevisaoFoto();
+  } catch (e) {
+    document.getElementById('foto-corpo').innerHTML =
+      `<p style="color:#FF4757;margin:0.5rem 0 0">⚠ ${escHtml(e.message || e)}</p>`;
+    const ac = document.getElementById('foto-acoes');
+    ac.style.display = 'flex';
+    ac.innerHTML = `<button class="btn-primary" style="flex:1" onclick="abrirSeletorFoto()">📷 Tentar outra foto</button>
+                    <button class="btn-secondary" style="flex:1" onclick="fecharModalFoto()">Fechar</button>`;
+  }
+}
+
+function opcoesJogador(r) {
+  const sug = r.sugestoes.filter(p => allPlayers.includes(p));
+  const op = p => `<option value="${escHtml(p)}" ${p === r.escolha ? 'selected' : ''}>${escHtml(p)}</option>`;
+  return `<option value="" ${!r.escolha ? 'selected' : ''}>— escolher —</option>` +
+    (sug.length ? `<optgroup label="Mais parecidos">${sug.map(op).join('')}</optgroup>` : '') +
+    `<optgroup label="Todos os jogadores">${allPlayers.filter(p => !sug.includes(p)).map(op).join('')}</optgroup>` +
+    `<optgroup label="Outros">
+       <option value="__novo__" ${r.escolha === '__novo__' ? 'selected' : ''}>➕ Cadastrar "${escHtml(r.texto)}" como novo</option>
+       <option value="__ignorar__" ${r.escolha === '__ignorar__' ? 'selected' : ''}>🚫 Ignorar</option>
+     </optgroup>`;
+}
+
+function renderRevisaoFoto() {
+  const corOpt = (t) => `<option value="" ${!t.cor ? 'selected' : ''}>cor?</option>` +
+    ['red', 'yellow', 'blue'].map(c => `<option value="${c}" ${t.cor === c ? 'selected' : ''}>${teamColors[c]} ${teamNames[c]}</option>`).join('');
+  const duvidas = fotoImport.times.reduce((n, t) => n + t.linhas.filter(r => r.status === 'duvida').length, 0);
+  const semCor = fotoImport.times.filter(t => !t.corDetectada).length;
+  let aviso = duvidas || semCor
+    ? `Confira ${duvidas ? `<b>${duvidas}</b> nome${duvidas > 1 ? 's' : ''} em dúvida` : ''}${duvidas && semCor ? ' e ' : ''}${semCor ? `a cor de <b>${semCor}</b> time${semCor > 1 ? 's' : ''}` : ''}. Os vínculos que você escolher ficam salvos para as próximas vezes.`
+    : 'Tudo reconhecido. Confira e confirme.';
+  if (allAssigned().size) aviso += '<br><span style="color:#FFD600">A escalação atual será substituída.</span>';
+
+  document.getElementById('foto-corpo').innerHTML = `<p style="margin-bottom:1rem">${aviso}</p>` +
+    fotoImport.times.map((t, ti) => `
+      <div class="foto-time foto-time-${t.cor || 'nenhuma'}">
+        <div class="foto-time-head">
+          <span>${escHtml(t.label)}</span>
+          <select class="foto-cor ${t.corDetectada ? '' : 'foto-alerta'}" onchange="fotoSetCor(${ti},this.value)">${corOpt(t)}</select>
+          <span class="foto-qtd">${t.linhas.filter(r => r.escolha && r.escolha !== '__ignorar__').length}/6</span>
+        </div>
+        ${t.linhas.map((r, ri) => r.status === 'certo' ? `
+          <div class="foto-linha">
+            <span class="foto-ok">✓ ${escHtml(r.escolha)}</span>
+            ${normNome(r.escolha) !== r.norm ? `<span class="foto-lido">lido: ${escHtml(r.texto)}</span>` : ''}
+            <button class="foto-trocar" onclick="fotoTrocar(${ti},${ri})" title="Trocar">✎</button>
+          </div>` : `
+          <div class="foto-linha">
+            <span class="foto-lido foto-lido-duvida">${escHtml(r.texto)}</span>
+            <select class="foto-sel ${r.escolha ? '' : 'foto-alerta'}" onchange="fotoSetJogador(${ti},${ri},this.value)">${opcoesJogador(r)}</select>
+          </div>`).join('')}
+      </div>`).join('') +
+    `<div id="foto-erro" style="display:none;color:#FF4757;font-size:0.8rem;margin-top:0.8rem"></div>`;
+  const ac = document.getElementById('foto-acoes');
+  ac.style.display = 'flex';
+  ac.innerHTML = `<button class="btn-primary" style="flex:1" onclick="confirmarFotoTimes()">✅ Preencher times</button>
+                  <button class="btn-secondary" style="flex:1" onclick="fecharModalFoto()">Cancelar</button>`;
+}
+
+function fotoSetCor(ti, cor) { fotoImport.times[ti].cor = cor || null; fotoImport.times[ti].corDetectada = !!cor; renderRevisaoFoto(); }
+function fotoSetJogador(ti, ri, v) { const r = fotoImport.times[ti].linhas[ri]; r.escolha = v; r.manual = true; renderRevisaoFoto(); }
+function fotoTrocar(ti, ri) {
+  const r = fotoImport.times[ti].linhas[ri];
+  if (!r.sugestoes.includes(r.escolha)) r.sugestoes.unshift(r.escolha);
+  r.status = 'duvida'; r.manual = true; renderRevisaoFoto();
+}
+
+async function confirmarFotoTimes() {
+  const erro = msg => { const el = document.getElementById('foto-erro'); el.textContent = '⚠ ' + msg; el.style.display = 'block'; };
+  const ts = fotoImport.times;
+  for (const t of ts) {
+    if (!t.cor) return erro(`Escolha a cor do ${t.label}.`);
+    const pend = t.linhas.find(r => !r.escolha);
+    if (pend) return erro(`Escolha o jogador para "${pend.texto}" (ou "Ignorar").`);
+  }
+  const cores = ts.map(t => t.cor);
+  if (new Set(cores).size !== cores.length) return erro('Dois times estão com a mesma cor.');
+
+  const novos = [];
+  const final = ts.map(t => ({ cor: t.cor, nomes: t.linhas.filter(r => r.escolha !== '__ignorar__').map(r => {
+    if (r.escolha !== '__novo__') return r.escolha;
+    const nome = r.texto.trim();
+    novos.push(nome); return nome;
+  }) }));
+  for (const nome of novos) {
+    if (/[<>"`\\]/.test(nome) || nome.length > 40 || !nome) return erro(`Nome inválido para cadastrar: "${nome}".`);
+  }
+  const todos = final.flatMap(f => f.nomes);
+  const dup = todos.find((n, i) => todos.indexOf(n) !== i);
+  if (dup) return erro(`${dup} aparece em mais de um lugar.`);
+  const cheio = final.find(f => f.nomes.length > 6);
+  if (cheio) return erro(`O time ${teamNames[cheio.cor]} ficou com ${cheio.nomes.length} jogadores (máx. 6). Marque algum como "Ignorar".`);
+
+  // aplica
+  novos.forEach(n => { if (!allPlayers.includes(n)) allPlayers.push(n); });
+  allPlayers.sort();
+  ['red', 'yellow', 'blue'].forEach(c => positionDefs.forEach(p => { teams[c][p.key] = ''; }));
+  final.forEach(f => f.nomes.forEach((n, i) => { teams[f.cor][positionDefs[i].key] = n; }));
+  renderAllSlots();
+
+  // vínculos escolhidos à mão viram apelidos
+  const apelidos = [];
+  ts.forEach(t => t.linhas.forEach(r => {
+    if (r.status === 'duvida' && r.escolha && !r.escolha.startsWith('__') && r.norm && r.norm !== normNome(r.escolha) && r.norm.length <= 40)
+      apelidos.push({ apelido: r.norm, jogador: r.escolha });
+  }));
+  fecharModalFoto();
+  showNotif('✅ Times preenchidos pela foto! Ajuste as posições se precisar.');
+
+  for (const n of novos) { try { await sb.rpc('adicionar_jogador', { p_nome: n }); } catch (e) {} }
+  if (apelidos.length) { try { await sb.rpc('salvar_apelidos', { p_lista: apelidos }); } catch (e) {} }
+}
 </script>
 </body>
 </html>
