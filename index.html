@@ -2625,7 +2625,10 @@ function calcularOveralls(hist, presenca) {
 // ordem: depois de cada pelada encerrada, todos os jogadores ganham um novo
 // valor. Por isso o histórico de variações se atualiza sozinho toda semana.
 // ============================================================
-const FOTOS_JOGADORES = {};   // futuro: { 'Nome': '/img/jogadores/nome.jpg' }
+// foto do jogador no card e no pódio (sem foto: iniciais). Arquivos em /img/jogadores/
+const FOTOS_JOGADORES = {
+  'Divino': '/img/jogadores/divino.jpg',
+};
 let overallCache = null;
 
 function iniciaisJogador(name) {
@@ -2636,7 +2639,8 @@ function iniciaisJogador(name) {
 }
 function avatarJogador(name) {
   const foto = FOTOS_JOGADORES[name];
-  return foto ? `<img src="${escHtml(foto)}" alt="">` : escHtml(iniciaisJogador(name));
+  const ini = escHtml(iniciaisJogador(name));
+  return foto ? `<img src="${escHtml(foto)}" alt="${escHtml(name)}" onerror="this.replaceWith(document.createTextNode('${ini}'))">` : ini;
 }
 function linkJogador(name) {
   return `<a class="player-link" href="#jogador/${encodeURIComponent(name)}">${escHtml(name)}</a>`;
