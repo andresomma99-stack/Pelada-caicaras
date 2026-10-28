@@ -25,6 +25,11 @@ naquele dia é uma linha em `participacoes` (time, V/E/D, gols, assistências, p
 - **Importar times por foto** (Ao Vivo): o print é lido no próprio celular (Tesseract.js); a cor do
   rótulo "TIME X" define o time. Nomes em dúvida são confirmados num pop-up e o vínculo vira um
   apelido em `apelidos` (`get_apelidos()` / `salvar_apelidos()`), reconhecido automaticamente depois.
+- **Posição do dia**: ao encerrar a pelada, um gatilho (`_gravar_posicoes`) copia a escalação do Ao Vivo
+  (`peladas.estado.teams`) para `participacoes.posicao` (ZAG/LAT/MEI/ATA).
+- **Overall (card do jogador)**: calculado no site a partir de `historicoPeladas`, começando na primeira pelada com
+  posições gravadas. Os pesos dos atributos dependem da posição (ATA/MEI × ZAG/LAT); faltas só reduzem a assiduidade.
+  Provisório até 5 peladas jogadas. Pesos em `OVR_CFG` no `index.html`.
 - Ninguém escreve nas tabelas diretamente: só por essas funções.
 
 Migrações em `supabase/migrations/`.
