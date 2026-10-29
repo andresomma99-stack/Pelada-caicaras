@@ -2583,11 +2583,16 @@ function initLocal() {
 // OVERALL (0-99)
 // ============================================================
 const OVR_CFG = {
-  K: 8,                       // jogos "fictícios" na média do grupo (evita overall inflado com poucos jogos)
+  K: 8,                       // jogos "fictícios" na média (evita overall inflado com poucos jogos)
   PESO_ASSIST: 0.7,           // assistência vale 70% de um gol
+  K_POS: 20,                  // jogos fictícios na média geral ao montar a média de G+A de cada posição
+  K_SEG: 20,                  // partidas fictícias na média do grupo para gols sofridos (~3 peladas)
+  SEG_ESCALA: 25,             // sofrer 0 gols ≈ 95; sofrer o dobro da média ≈ 45
+  GOLEIRO_MIN_PELADAS: 10,    // ajuste por goleiro só depois de 10 peladas com placar registrado
+  K_GOLEIRO: 20,              // partidas fictícias na média ao medir o efeito de cada goleiro
   PESOS: {                    // peso dos atributos conforme a posição escalada no dia
-    OF:  { RES: 0.35, ATA: 0.30, FOR: 0.15, ASS: 0.10, EXP: 0.10 },   // ATA / MEI
-    DEF: { RES: 0.50, ATA: 0.00, FOR: 0.25, ASS: 0.10, EXP: 0.15 },   // ZAG / LAT
+    OF:  { RES: 0.30, ATA: 0.35, SEG: 0.05, FOR: 0.15, ASS: 0.10, EXP: 0.05 },   // ATA / MEI
+    DEF: { RES: 0.35, ATA: 0.10, SEG: 0.25, FOR: 0.15, ASS: 0.10, EXP: 0.05 },   // ZAG / LAT
   },
   GRUPO: { ATA: 'OF', MEI: 'OF', ZAG: 'DEF', LAT: 'DEF' },
   JANELA_FORMA: 5, JANELA_ASSID: 10, EXP_TETO: 30, ESTICA: 1.3, MIN_JOGOS: 5
@@ -2598,20 +2603,41 @@ function _clampOvr(x, lo = 25, hi = 99) { return Math.max(lo, Math.min(hi, x)); 
 // Peladas anteriores não entram. Dia jogado: todos os atributos são recalculados e
 // o peso de cada um segue a mistura de posições em que o jogador já foi escalado.
 // Dia em que faltou: só a assiduidade (ASS) muda; o resto fica congelado.
+// Cada pelada usa só os dados disponíveis até ela (nada do futuro entra no passado).
+//  • ATA: G+A por jogo comparado à média da POSIÇÃO (zagueiro contra zagueiros).
+//  • SEG: gols que o time sofreu por partida em que o jogador esteve em campo
+//    (o total do time, não dividido), comparado à média do grupo. A partir de
+//    10 peladas com placar, desconta o efeito do goleiro que estava no gol.
 function calcularOveralls(hist, presenca) {
   const C = OVR_CFG;
   const t0 = hist.findIndex(p => (p.jogadores || []).some(x => x.pos));
-  if (t0 < 0) return { inicio: null, jogadores: {} };
+  if (t0 < 0) return { inicio: null, jogadores: {}, goleiro: { ativo: false, peladas: 0, efeito: {} } };
   const presPor = {};
   (presenca || []).forEach(p => { presPor[p.name] = p.dates || []; });
   const acc = {}, out = {};
   const lg = { pts: 0, jogos: 0, ga: 0 };
+  const lgPos = { OF: { jogos: 0, ga: 0 }, DEF: { jogos: 0, ga: 0 } };
+  const lgSeg = { p: 0, gs: 0 };            // por time-partida
+  const gkAcc = {};                          // goleiro -> { p, gs }
+  let pelSeg = 0, gkInfo = { ativo: false, peladas: 0, media: 0, efeito: {} };
   for (let t = t0; t < hist.length; t++) {
     const pel = hist[t];
     const gols = pel.gols || {}, assists = pel.assists || {};
+    // gols sofridos por time no dia, partida a partida, com o goleiro de cada lado
+    const sofr = {};                         // cor -> [{ gs, gk }]
+    const partidas = Array.isArray(pel.partidas) ? pel.partidas : [];
+    partidas.forEach(m => {
+      [[m.a, +m.sb || 0, m.ga], [m.b, +m.sa || 0, m.gb]].forEach(([cor, gs, gk]) => {
+        if (!cor) return;
+        (sofr[cor] || (sofr[cor] = [])).push({ gs, gk });
+        lgSeg.p++; lgSeg.gs += gs;
+        if (gk) { const g = gkAcc[gk] || (gkAcc[gk] = { p: 0, gs: 0 }); g.p++; g.gs += gs; }
+      });
+    });
+    if (partidas.length) pelSeg++;
     const posDia = {};
-    (pel.jogadores || []).forEach(({ name, res, pos }) => {
-      const a = acc[name] || (acc[name] = { j:0, v:0, e:0, d:0, g:0, a:0, jogos:[], posCont:{}, fixo:null });
+    (pel.jogadores || []).forEach(({ name, res, pos, time }) => {
+      const a = acc[name] || (acc[name] = { j:0, v:0, e:0, d:0, g:0, a:0, jogos:[], posCont:{}, fixo:null, sp:0, sgs:0, sgk:{} });
       const g = +gols[name] || 0, as = +assists[name] || 0;
       const pts = res === 'V' ? 3 : res === 'E' ? 1 : 0;
       // sem posição gravada: usa a posição mais frequente dele (ou MEI)
@@ -2620,28 +2646,53 @@ function calcularOveralls(hist, presenca) {
       a.posCont[p] = (a.posCont[p] || 0) + 1;
       a.j++; a.g += g; a.a += as;
       if (res === 'V') a.v++; else if (res === 'E') a.e++; else a.d++;
-      a.jogos.push({ t, pts, ga: g + C.PESO_ASSIST * as });
-      lg.pts += pts; lg.jogos++; lg.ga += g + C.PESO_ASSIST * as;
+      const ga = g + C.PESO_ASSIST * as;
+      a.jogos.push({ t, pts, ga, grp: C.GRUPO[p] });
+      lg.pts += pts; lg.jogos++; lg.ga += ga;
+      lgPos[C.GRUPO[p]].jogos++; lgPos[C.GRUPO[p]].ga += ga;
+      (sofr[time] || []).forEach(({ gs, gk }) => {
+        a.sp++; a.sgs += gs;
+        if (gk) a.sgk[gk] = (a.sgk[gk] || 0) + 1;
+      });
     });
     if (!lg.jogos) continue;
     const lgAprov = lg.pts / (3 * lg.jogos);
     const lgGA = Math.max(lg.ga / lg.jogos, 0.1);
+    // média de G+A de cada posição, puxada para a média geral enquanto há poucos jogos
+    const refPos = {};
+    Object.entries(lgPos).forEach(([k, v]) => { refPos[k] = Math.max((v.ga + C.K_POS * lgGA) / (v.jogos + C.K_POS), 0.1); });
+    const mGS = lgSeg.p ? lgSeg.gs / lgSeg.p : 0;
+    const gkAtivo = pelSeg >= C.GOLEIRO_MIN_PELADAS && mGS > 0;
+    const gkEf = {};
+    if (gkAtivo) Object.entries(gkAcc).forEach(([k, v]) => { gkEf[k] = (v.gs + C.K_GOLEIRO * mGS) / (v.p + C.K_GOLEIRO) - mGS; });
     const ini = Math.max(t0, t - C.JANELA_ASSID + 1), nJan = t - ini + 1;
     Object.entries(acc).forEach(([name, a]) => {
       const jogou = name in posDia;
       if (jogou) {
         const aprovAdj = (3 * a.v + a.e + C.K * 3 * lgAprov) / (3 * (a.j + C.K));
-        const gaAdj = (a.g + C.PESO_ASSIST * a.a + C.K * lgGA) / (a.j + C.K);
+        // referência de G+A = média da posição de cada jogo dele
+        const ref = Math.max(a.jogos.reduce((s, x) => s + refPos[x.grp], 0) / a.j, 0.1);
+        const gaAdj = (a.g + C.PESO_ASSIST * a.a + C.K * ref) / (a.j + C.K);
         const ult = a.jogos.slice(-C.JANELA_FORMA);
         const falta = C.JANELA_FORMA - ult.length;
+        const refUlt = ult.reduce((s, x) => s + refPos[x.grp], 0);
         const ptsRate = (ult.reduce((s, x) => s + x.pts, 0) + falta * 3 * lgAprov) / (3 * C.JANELA_FORMA);
-        const gaRate  = (ult.reduce((s, x) => s + x.ga, 0)  + falta * lgGA) / C.JANELA_FORMA;
+        const gaRate  = (ult.reduce((s, x) => s + x.ga, 0)  + falta * ref) / (refUlt + falta * ref);
+        // gols sofridos: desconta o efeito dos goleiros que estavam no gol (quando ativo)
+        let seg = 70, gsLiq = a.sgs;
+        if (mGS > 0) {
+          if (gkAtivo) Object.entries(a.sgk).forEach(([gk, n]) => { gsLiq -= n * (gkEf[gk] || 0); });
+          const gsAdj = (gsLiq + C.K_SEG * mGS) / (a.sp + C.K_SEG);
+          seg = _clampOvr(70 + C.SEG_ESCALA * (mGS - gsAdj) / mGS);
+        }
         a.fixo = {
           RES: _clampOvr(70 + 120 * (aprovAdj - lgAprov)),
-          ATA: _clampOvr(70 + 22 * (gaAdj / lgGA - 1)),
-          FOR: _clampOvr(70 + 60 * (ptsRate - lgAprov) + 10 * (gaRate / lgGA - 1)),
+          ATA: _clampOvr(70 + 22 * (gaAdj / ref - 1)),
+          SEG: seg,
+          FOR: _clampOvr(70 + 60 * (ptsRate - lgAprov) + 10 * (gaRate - 1)),
           EXP: _clampOvr(45 + 54 * Math.min(1, Math.sqrt(a.j / C.EXP_TETO))),
         };
+        a.segInfo = { partidas: a.sp, sofridos: a.sgs, liquido: gkAtivo ? gsLiq : null };
       }
       // assiduidade: presença nas últimas 10 peladas desde o início do overall
       const pd = presPor[name] || [];
@@ -2652,7 +2703,7 @@ function calcularOveralls(hist, presenca) {
       }
       const at = { ...a.fixo, ASS: _clampOvr(45 + 54 * Math.max(0, soma) / nJan) };
       // pesos = mistura das posições em que já jogou (cada pelada conta 1)
-      const P = { RES: 0, ATA: 0, FOR: 0, ASS: 0, EXP: 0 };
+      const P = { RES: 0, ATA: 0, SEG: 0, FOR: 0, ASS: 0, EXP: 0 };
       Object.entries(a.posCont).forEach(([pos, n]) => {
         const w = C.PESOS[C.GRUPO[pos]];
         Object.keys(P).forEach(k => { P[k] += w[k] * n / a.j; });
@@ -2662,11 +2713,12 @@ function calcularOveralls(hist, presenca) {
       const s = out[name] || (out[name] = { serie: [] });
       s.serie.push({ t, data: pel.data, ovr, j: a.j, jogou, pos: jogou ? posDia[name] : null });
       const principal = Object.entries(a.posCont).sort((x, y) => y[1] - x[1])[0][0];
-      s.atual = { ovr, j: a.j, principal, pesos: P,
+      s.atual = { ovr, j: a.j, principal, pesos: P, seg: a.segInfo,
                   attrs: Object.fromEntries(Object.entries(at).map(([k, v]) => [k, Math.round(v)])) };
     });
+    gkInfo = { ativo: gkAtivo, peladas: pelSeg, media: mGS, efeito: gkEf };
   }
-  return { inicio: hist[t0].data, jogadores: out };
+  return { inicio: hist[t0].data, jogadores: out, goleiro: gkInfo };
 }
 
 // ============================================================
@@ -2736,11 +2788,12 @@ function voltarClassificacao() {
 window.addEventListener('hashchange', rotaJogador);
 document.addEventListener('click', e => { if (e.target.closest && e.target.closest('.player-link')) { try { sessionStorage.setItem('pj_nav', '1'); } catch (x) {} } });
 
-// ---------- gráfico pentágono (atributos do overall) ----------
-const RADAR_ATTRS = [['RES', 'Resultados'], ['ATA', 'Ataque'], ['FOR', 'Forma'], ['ASS', 'Assiduidade'], ['EXP', 'Experiência']];
+// ---------- gráfico hexágono (atributos do overall) ----------
+// opostos no gráfico: RES × EXP, ATA × SEG, FOR × ASS
+const RADAR_ATTRS = [['RES', 'Resultados'], ['ATA', 'Ataque'], ['FOR', 'Forma'], ['EXP', 'Experiência'], ['SEG', 'Segurança'], ['ASS', 'Assiduidade']];
 const RADAR_MIN = 20, RADAR_MAX = 99;
 function radarPonto(cx, cy, R, i, frac) {
-  const ang = (-90 + i * 72) * Math.PI / 180;
+  const ang = (-90 + i * 360 / RADAR_ATTRS.length) * Math.PI / 180;
   return [cx + Math.cos(ang) * R * frac, cy + Math.sin(ang) * R * frac];
 }
 function radarFrac(v) { return v == null ? 0 : Math.max(0.04, Math.min(1, (v - RADAR_MIN) / (RADAR_MAX - RADAR_MIN))); }
@@ -2864,7 +2917,7 @@ async function gerarImagemCard(d) {
   while (ctx.measureText(d.nome.toUpperCase()).width > cw - 120 && fs > 36) { fs -= 4; ctx.font = `700 ${fs}px "DM Sans", sans-serif`; }
   ctx.fillText(d.nome.toUpperCase(), W / 2, ay + ar + 80);
 
-  // pentágono
+  // hexágono
   const rx = W / 2, ry = cy0 + 715, R = 175;
   const poly = frac => { ctx.beginPath(); RADAR_ATTRS.forEach((_, i) => { const [x, y] = radarPonto(rx, ry, R, i, frac); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.closePath(); };
   [0.25, 0.5, 0.75, 1].forEach(f => { poly(f); ctx.strokeStyle = f === 1 ? ta : 'rgba(255,255,255,0.12)'; ctx.lineWidth = f === 1 ? 3 : 2; ctx.stroke(); });
@@ -3016,8 +3069,9 @@ function renderJogador(nome) {
         <div class="pj-sep"></div>
         <div class="pj-attrs">
           ${A('RES', 'RES')}${A('ATA', 'ATA')}
-          ${A('FOR', 'FOR')}${A('ASS', 'ASS')}
-          ${A('EXP', 'EXP')}<div class="pj-attr"><b>${pos + 1}º</b><span>RANK</span></div>
+          ${A('SEG', 'SEG')}${A('FOR', 'FOR')}
+          ${A('ASS', 'ASS')}${A('EXP', 'EXP')}
+          <div class="pj-attr"><b>${pos + 1}º</b><span>RANK</span></div>
         </div>
       </div>
       <div>
@@ -3036,6 +3090,7 @@ function renderJogador(nome) {
           ${S(f2(gols), 'Gols / pelada')}
           ${S(f2(assists), 'Assist. / pelada')}
           ${S(f2(gols + assists), 'G+A / pelada')}
+          ${ov && ov.atual.seg && ov.atual.seg.partidas ? S((ov.atual.seg.sofridos / ov.atual.seg.partidas).toFixed(2).replace('.', ','), 'Sofridos / partida') : ''}
           ${S(String(pre.anual ?? '–').replace('.', ','), 'Presenças')}
           ${S(String(pre.u10 ?? '–').replace('.', ',') + '<span style="font-size:.8rem;color:var(--muted)">/10</span>', 'Últimas 10')}
         </div>
@@ -3051,15 +3106,18 @@ function renderJogador(nome) {
     <div class="pj-block pj-info">
       <details>
         <summary>Como o overall é calculado</summary>
-        <p style="margin-top:0.6rem">Nota de 0 a 99, recalculada depois de cada pelada encerrada${todos.inicio ? `, contando a partir de ${escHtml(todos.inicio)}` : ''}. Combina 5 atributos, e o peso de cada um depende da posição em que o jogador foi escalado no Ao Vivo:</p>
+        <p style="margin-top:0.6rem">Nota de 0 a 99, recalculada depois de cada pelada encerrada${todos.inicio ? `, contando a partir de ${escHtml(todos.inicio)}` : ''}. Combina 6 atributos, e o peso de cada um depende da posição em que o jogador foi escalado no Ao Vivo:</p>
         <ul>
           <li><b>RES · Resultados</b> — aproveitamento de pontos comparado ao do grupo. <i>ATA/MEI ${pc(P.OF,'RES')} · ZAG/LAT ${pc(P.DEF,'RES')}</i></li>
-          <li><b>ATA · Ataque</b> — gols + assistências por pelada (assistência vale 0,7 gol). <i>ATA/MEI ${pc(P.OF,'ATA')} · ZAG/LAT não conta</i></li>
-          <li><b>FOR · Forma</b> — resultados e gols nas últimas 5 peladas jogadas. <i>ATA/MEI ${pc(P.OF,'FOR')} · ZAG/LAT ${pc(P.DEF,'FOR')}</i></li>
+          <li><b>ATA · Ataque</b> — gols + assistências por pelada (assistência vale 0,7 gol), comparado à média da posição: zagueiro e lateral são medidos contra os defensores. <i>ATA/MEI ${pc(P.OF,'ATA')} · ZAG/LAT ${pc(P.DEF,'ATA')}</i></li>
+          <li><b>SEG · Segurança</b> — gols que o time sofreu por partida com o jogador em campo, comparado à média do grupo (menos gols, nota maior). ${todos.goleiro && todos.goleiro.ativo
+            ? 'Já desconta o efeito do goleiro que estava no gol.'
+            : `A partir de ${OVR_CFG.GOLEIRO_MIN_PELADAS} peladas com placar, passa a descontar o efeito do goleiro (agora: ${todos.goleiro ? todos.goleiro.peladas : 0}).`} <i>ATA/MEI ${pc(P.OF,'SEG')} · ZAG/LAT ${pc(P.DEF,'SEG')}</i></li>
+          <li><b>FOR · Forma</b> — resultados e gols nas últimas 5 peladas jogadas. <i>${pc(P.OF,'FOR')} em todas</i></li>
           <li><b>ASS · Assiduidade</b> — presença nas últimas 10 peladas. <i>${pc(P.OF,'ASS')} em todas</i></li>
-          <li><b>EXP · Experiência</b> — peladas jogadas (máximo a partir de 30). <i>ATA/MEI ${pc(P.OF,'EXP')} · ZAG/LAT ${pc(P.DEF,'EXP')}</i></li>
+          <li><b>EXP · Experiência</b> — peladas jogadas (máximo a partir de 30). <i>${pc(P.OF,'EXP')} em todas</i></li>
         </ul>
-        <p style="margin-top:0.6rem">Quem joga em posições diferentes tem os pesos misturados conforme as peladas em cada posição. Faltar não muda os outros atributos, só derruba a assiduidade. Até ${OVR_CFG.MIN_JOGOS} peladas jogadas o overall é provisório e puxado para a média do grupo.</p>
+        <p style="margin-top:0.6rem">Quem joga em posições diferentes tem os pesos misturados conforme as peladas em cada posição. Faltar não muda os outros atributos, só derruba a assiduidade. Com poucos jogos, cada atributo é puxado para a média do grupo; até ${OVR_CFG.MIN_JOGOS} peladas jogadas o overall aparece como provisório.</p>
       </details>
     </div>`;
 }
@@ -3067,19 +3125,19 @@ function renderJogador(nome) {
 // ============================================================
 // JOGADOR DA SEMANA (POTW)
 // Nota do dia (0-10) só com o que aconteceu naquela pelada. O bônus do
-// resultado é multiplicado pelo peso de RES da posição escalada (ZAG/LAT
-// 50% ÷ ATA/MEI 35% = ×1,43), igual ao overall. Gols e assistências valem o
+// resultado é multiplicado por 1,43 para ZAG/LAT (fixo; era a razão dos pesos de
+// RES do overall antigo e foi mantido para a nota do dia não mudar). Gols e assistências valem o
 // mesmo para todos, com retorno decrescente (somam no máximo +3,2), para que
 // um dia de 6 gols não empate em 10 com um de 3.
 // Desempate: resultado, G+A, gols, overall do dia, nome.
 // ============================================================
-const NOTA_CFG = { base: 6.0, V: 1.2, E: 0.3, D: -0.6, gol: 0.55, assist: 0.4, tetoGA: 3.2, curvaGA: 2.2 };
+const NOTA_CFG = { multDEF: 1.43, base: 6.0, V: 1.2, E: 0.3, D: -0.6, gol: 0.55, assist: 0.4, tetoGA: 3.2, curvaGA: 2.2 };
 const POS_ORDEM = { ZAG: 0, LAT: 1, MEI: 2, ATA: 3 };
 let potwCache = null;
 
 function notaDoDia(res, g, a, pos) {
   const grupo = OVR_CFG.GRUPO[pos] || 'OF';
-  const mult = OVR_CFG.PESOS[grupo].RES / OVR_CFG.PESOS.OF.RES;
+  const mult = grupo === 'DEF' ? NOTA_CFG.multDEF : 1;
   const ga = NOTA_CFG.gol * g + NOTA_CFG.assist * a;
   const n = NOTA_CFG.base + (NOTA_CFG[res] || 0) * mult + NOTA_CFG.tetoGA * (1 - Math.exp(-ga / NOTA_CFG.curvaGA));
   return Math.round(Math.max(3, Math.min(10, n)) * 10) / 10;
